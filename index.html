@@ -484,6 +484,41 @@
     
     firebase.initializeApp(firebaseConfig);
 
+    // Initialize Firebase Database Structure
+    function initializeFirebaseDatabase() {
+      const db = firebase.database();
+      
+      // Initialize all required fields with default values
+      const initialData = {
+        windowPosition: 50,          // Starting at 50% (middle position)
+        motorStatus: "idle",         // Motor is not moving
+        temperature: 24,             // Default room temperature in Celsius
+        windowCommand: "none",       // No command pending
+        targetPosition: 50,          // Target position matches current
+        
+        // Optional: Add timestamp for when database was initialized
+        lastInitialized: firebase.database.ServerValue.TIMESTAMP
+      };
+      
+      // Set initial data (this will only set if the values don't exist)
+      Object.keys(initialData).forEach(key => {
+        db.ref(`/${key}`).transaction(currentValue => {
+          // Only set if the value doesn't exist (is null)
+          if (currentValue === null) {
+            console.log(`Initializing ${key} with value:`, initialData[key]);
+            return initialData[key];
+          }
+          // Keep existing value
+          return undefined;
+        });
+      });
+      
+      console.log("Firebase database structure initialized!");
+    }
+
+    // Call initialization after Firebase is ready
+    initializeFirebaseDatabase();
+
     // DOM Elements
     const loginScreen = document.getElementById("loginScreen");
     const dashboard = document.getElementById("dashboard");
