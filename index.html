@@ -2,192 +2,467 @@
 <html>
 <head>
   <meta charset="UTF-8" />
-  <title>Firebase Relay Control Dashboard</title>
+  <title>Smart Window Shading Control</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <style>
-    body {
-      font-family: Arial, sans-serif;
-      text-align: center;
-      background-color: #f9f9f9;
+    * {
       margin: 0;
-      padding: 0 10px 40px;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
       display: flex;
       flex-direction: column;
-      min-height: 100vh;
-      justify-content: space-between;
+      color: #333;
     }
-    h1 {
-      margin-top: 30px;
-      font-size: 1.8rem;
-    }
-    .relay-card {
-      display: inline-block;
-      background-color: white;
+    
+    .header {
+      background: rgba(255, 255, 255, 0.1);
+      backdrop-filter: blur(10px);
       padding: 20px;
-      margin: 15px;
-      border-radius: 15px;
-      box-shadow: 0 4px 10px rgba(0,0,0,0.1);
-      width: 220px;
-      vertical-align: top;
+      text-align: center;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.2);
     }
-    .relay-card h2 {
-      margin-bottom: 10px;
-      font-size: 1.3rem;
+    
+    .header h1 {
+      color: white;
+      font-size: 1.8rem;
+      margin-bottom: 5px;
+      text-shadow: 0 2px 4px rgba(0,0,0,0.3);
     }
-    .relay-card p {
-      margin-bottom: 10px;
+    
+    .header p {
+      color: rgba(255, 255, 255, 0.9);
       font-size: 1rem;
     }
-    .relay-card button {
-      padding: 10px 20px;
-      border: none;
-      border-radius: 10px;
-      color: white;
-      background-color: blue;
-      cursor: pointer;
-      font-size: 16px;
-      width: 90%;
-      transition: opacity 0.3s ease;
-    }
-    .relay-card button:hover {
-      opacity: 0.8;
-    }
-    #allOffBtn, #logoutBtn {
-      max-width: 300px;
-      width: 90%;
-      padding: 12px 25px;
-      font-size: 16px;
-      border: none;
-      border-radius: 10px;
-      cursor: pointer;
-      margin: 15px auto;
-      display: block;
-      color: white;
-      transition: opacity 0.3s ease;
-    }
-    #allOffBtn {
-      background-color: #d32f2f;
-    }
-    #allOffBtn:hover {
-      opacity: 0.8;
-    }
-    #logoutBtn {
-      background-color: #555;
-    }
-    #logoutBtn:hover {
-      opacity: 0.8;
-    }
-
-    #dashboard {
-      display: none;
-    }
-    #loginForm {
-      max-width: 400px;
-      margin: 80px auto 20px;
-      background: white;
-      padding: 30px 20px;
-      border-radius: 15px;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-    }
-    #loginForm input {
-      width: 100%;
-      padding: 12px 15px;
-      margin: 10px 0 20px;
-      font-size: 1rem;
-      border: 1.5px solid #ccc;
-      border-radius: 10px;
-      box-sizing: border-box;
-      outline-offset: 2px;
-      transition: border-color 0.3s ease;
-    }
-    #loginForm input:focus {
-      border-color: #1e88e5;
-    }
-    #loginForm button {
-      width: 100%;
-      background-color: #1e88e5;
-      color: white;
-      padding: 12px;
-      font-size: 18px;
-      border: none;
-      border-radius: 10px;
-      cursor: pointer;
-      transition: background-color 0.3s ease;
-    }
-    #loginForm button:hover {
-      background-color: #1565c0;
-    }
-    #dashboard .relay-container {
-      max-width: 960px;
-      margin: 20px auto 0;
+    
+    .main-container {
+      flex: 1;
       display: flex;
-      flex-wrap: wrap;
-      justify-content: center;
+      flex-direction: column;
+      align-items: center;
+      padding: 30px 20px;
     }
-    @media (max-width: 700px) {
-      .relay-card {
-        width: 90%;
-        margin: 10px auto;
-        display: block;
-      }
-      body {
-        padding: 0 10px 60px;
-      }
+    
+    .status-panel {
+      background: rgba(255, 255, 255, 0.95);
+      backdrop-filter: blur(10px);
+      padding: 25px;
+      border-radius: 20px;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+      margin-bottom: 30px;
+      width: 100%;
+      max-width: 400px;
+      text-align: center;
     }
-    footer {
+    
+    .temperature-display {
+      font-size: 2.5rem;
+      font-weight: bold;
+      color: #4a5568;
+      margin-bottom: 10px;
+    }
+    
+    .status-info {
+      display: flex;
+      justify-content: space-between;
+      margin-top: 20px;
+      padding: 15px;
+      background: rgba(103, 126, 234, 0.1);
+      border-radius: 12px;
+    }
+    
+    .status-item {
+      text-align: center;
+      flex: 1;
+    }
+    
+    .status-label {
       font-size: 0.9rem;
       color: #666;
-      padding: 10px 0;
-      margin-top: 40px;
+      margin-bottom: 5px;
+    }
+    
+    .status-value {
+      font-weight: bold;
+      color: #4a5568;
+      font-size: 1.1rem;
+    }
+    
+    .control-panel {
+      background: rgba(255, 255, 255, 0.95);
+      backdrop-filter: blur(10px);
+      padding: 30px;
+      border-radius: 20px;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+      width: 100%;
+      max-width: 400px;
+    }
+    
+    .control-section {
+      margin-bottom: 30px;
+    }
+    
+    .section-title {
+      font-size: 1.2rem;
+      font-weight: bold;
+      color: #4a5568;
+      margin-bottom: 20px;
+      text-align: center;
+      border-bottom: 2px solid #e2e8f0;
+      padding-bottom: 10px;
+    }
+    
+    .quick-controls {
+      display: flex;
+      gap: 15px;
+      justify-content: center;
+      margin-bottom: 25px;
+    }
+    
+    .control-btn {
+      flex: 1;
+      padding: 20px;
+      border: none;
+      border-radius: 15px;
+      font-size: 1rem;
+      font-weight: bold;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+      min-height: 80px;
+      justify-content: center;
+    }
+    
+    .open-btn {
+      background: linear-gradient(135deg, #48bb78, #38a169);
+      color: white;
+    }
+    
+    .open-btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(72, 187, 120, 0.4);
+    }
+    
+    .close-btn {
+      background: linear-gradient(135deg, #f56565, #e53e3e);
+      color: white;
+    }
+    
+    .close-btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(245, 101, 101, 0.4);
+    }
+    
+    .btn-icon {
+      font-size: 1.5rem;
+    }
+    
+    .manual-control {
+      background: rgba(103, 126, 234, 0.05);
+      padding: 25px;
+      border-radius: 15px;
+      border: 2px solid rgba(103, 126, 234, 0.2);
+    }
+    
+    .slider-container {
+      margin: 20px 0;
+    }
+    
+    .slider-label {
+      display: flex;
+      justify-content: between;
+      align-items: center;
+      margin-bottom: 15px;
+    }
+    
+    .position-value {
+      background: #667eea;
+      color: white;
+      padding: 8px 15px;
+      border-radius: 20px;
+      font-weight: bold;
+      min-width: 60px;
+      text-align: center;
+    }
+    
+    .slider {
+      width: 100%;
+      height: 8px;
+      border-radius: 5px;
+      background: linear-gradient(to right, #e2e8f0 0%, #667eea 0%);
+      outline: none;
+      -webkit-appearance: none;
+      appearance: none;
+    }
+    
+    .slider::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 25px;
+      height: 25px;
+      border-radius: 50%;
+      background: #667eea;
+      cursor: pointer;
+      box-shadow: 0 2px 8px rgba(102, 126, 234, 0.4);
+    }
+    
+    .slider::-moz-range-thumb {
+      width: 25px;
+      height: 25px;
+      border-radius: 50%;
+      background: #667eea;
+      cursor: pointer;
+      border: none;
+      box-shadow: 0 2px 8px rgba(102, 126, 234, 0.4);
+    }
+    
+    .apply-btn {
+      width: 100%;
+      padding: 15px;
+      background: linear-gradient(135deg, #667eea, #764ba2);
+      color: white;
+      border: none;
+      border-radius: 12px;
+      font-size: 1.1rem;
+      font-weight: bold;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      margin-top: 15px;
+    }
+    
+    .apply-btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
+    }
+    
+    .login-container {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      padding: 20px;
+    }
+    
+    .login-form {
+      background: rgba(255, 255, 255, 0.95);
+      backdrop-filter: blur(10px);
+      padding: 40px 30px;
+      border-radius: 20px;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.2);
+      width: 100%;
+      max-width: 400px;
+      text-align: center;
+    }
+    
+    .login-form h2 {
+      color: #4a5568;
+      margin-bottom: 30px;
+      font-size: 1.8rem;
+    }
+    
+    .form-group {
+      margin-bottom: 20px;
+      text-align: left;
+    }
+    
+    .form-group label {
+      display: block;
+      margin-bottom: 8px;
+      color: #4a5568;
+      font-weight: 500;
+    }
+    
+    .form-group input {
+      width: 100%;
+      padding: 15px;
+      border: 2px solid #e2e8f0;
+      border-radius: 12px;
+      font-size: 1rem;
+      transition: all 0.3s ease;
+      background: rgba(255, 255, 255, 0.9);
+    }
+    
+    .form-group input:focus {
+      outline: none;
+      border-color: #667eea;
+      box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+    }
+    
+    .login-btn {
+      width: 100%;
+      padding: 15px;
+      background: linear-gradient(135deg, #667eea, #764ba2);
+      color: white;
+      border: none;
+      border-radius: 12px;
+      font-size: 1.1rem;
+      font-weight: bold;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      margin-top: 10px;
+    }
+    
+    .login-btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
+    }
+    
+    .logout-btn {
+      background: rgba(255, 255, 255, 0.2);
+      border: 2px solid rgba(255, 255, 255, 0.3);
+      color: white;
+      padding: 12px 24px;
+      border-radius: 25px;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      backdrop-filter: blur(10px);
+    }
+    
+    .logout-btn:hover {
+      background: rgba(255, 255, 255, 0.3);
+      transform: translateY(-2px);
+    }
+    
+    .footer {
+      text-align: center;
+      padding: 20px;
+      color: rgba(255, 255, 255, 0.7);
+      font-size: 0.9rem;
+    }
+    
+    .hidden {
+      display: none;
+    }
+    
+    @media (max-width: 480px) {
+      .header {
+        padding: 15px;
+      }
+      
+      .header h1 {
+        font-size: 1.5rem;
+      }
+      
+      .main-container {
+        padding: 20px 15px;
+      }
+      
+      .control-panel, .status-panel {
+        padding: 20px;
+      }
+      
+      .quick-controls {
+        flex-direction: column;
+      }
+      
+      .control-btn {
+        min-height: 60px;
+      }
     }
   </style>
 </head>
 <body>
-
-  <h1>Firebase Relay Control Dashboard</h1>
-
-  <!-- Login form -->
-  <div id="loginForm">
-    <input type="email" id="email" placeholder="Enter Email" required />
-    <input type="password" id="password" placeholder="Enter Password" required />
-    <button id="loginBtn">Login</button>
+  <!-- Login Screen -->
+  <div id="loginScreen" class="login-container">
+    <div class="login-form">
+      <h2>🏠 Smart Window Control</h2>
+      <div class="form-group">
+        <label for="email">Email Address</label>
+        <input type="email" id="email" placeholder="Enter your email" required />
+      </div>
+      <div class="form-group">
+        <label for="password">Password</label>
+        <input type="password" id="password" placeholder="Enter your password" required />
+      </div>
+      <button id="loginBtn" class="login-btn">Sign In</button>
+    </div>
   </div>
 
-  <!-- Dashboard -->
-  <div id="dashboard">
-    <div class="relay-container">
-      <div class="relay-card">
-        <h2>Relay 1</h2>
-        <p>Status: <span id="status1">Loading...</span></p>
-        <button id="btn1">Toggle</button>
+  <!-- Main Dashboard -->
+  <div id="dashboard" class="hidden">
+    <div class="header">
+      <h1>🪟 Smart Window Shading</h1>
+      <p>Thermal Comfort Control System</p>
+      <button id="logoutBtn" class="logout-btn">Logout</button>
+    </div>
+
+    <div class="main-container">
+      <!-- Status Panel -->
+      <div class="status-panel">
+        <div class="temperature-display" id="temperatureDisplay">24°C</div>
+        <p style="color: #666; margin-bottom: 15px;">Current Room Temperature</p>
+        
+        <div class="status-info">
+          <div class="status-item">
+            <div class="status-label">Shade Position</div>
+            <div class="status-value" id="shadePosition">50%</div>
+          </div>
+          <div class="status-item">
+            <div class="status-label">Motor Status</div>
+            <div class="status-value" id="motorStatus">Idle</div>
+          </div>
+          <div class="status-item">
+            <div class="status-label">Light Level</div>
+            <div class="status-value" id="lightLevel">Medium</div>
+          </div>
+        </div>
       </div>
 
-      <div class="relay-card">
-        <h2>Relay 2</h2>
-        <p>Status: <span id="status2">Loading...</span></p>
-        <button id="btn2">Toggle</button>
-      </div>
+      <!-- Control Panel -->
+      <div class="control-panel">
+        <!-- Quick Controls -->
+        <div class="control-section">
+          <h3 class="section-title">Quick Controls</h3>
+          <div class="quick-controls">
+            <button id="openBtn" class="control-btn open-btn">
+              <span class="btn-icon">🌅</span>
+              <span>OPEN</span>
+            </button>
+            <button id="closeBtn" class="control-btn close-btn">
+              <span class="btn-icon">🌙</span>
+              <span>CLOSE</span>
+            </button>
+          </div>
+        </div>
 
-      <div class="relay-card">
-        <h2>Relay 3</h2>
-        <p>Status: <span id="status3">Loading...</span></p>
-        <button id="btn3">Toggle</button>
-      </div>
-
-      <div class="relay-card">
-        <h2>Relay 4</h2>
-        <p>Status: <span id="status4">Loading...</span></p>
-        <button id="btn4">Toggle</button>
+        <!-- Manual Control -->
+        <div class="control-section">
+          <div class="manual-control">
+            <h3 class="section-title">Manual Position Control</h3>
+            
+            <div class="slider-container">
+              <div class="slider-label">
+                <span>Shade Position:</span>
+                <span class="position-value" id="sliderValue">50%</span>
+              </div>
+              <input type="range" min="0" max="100" value="50" class="slider" id="positionSlider">
+              <div style="display: flex; justify-content: space-between; font-size: 0.8rem; color: #666; margin-top: 5px;">
+                <span>Fully Open</span>
+                <span>Fully Closed</span>
+              </div>
+            </div>
+            
+            <button id="applyBtn" class="apply-btn">
+              Apply Position
+            </button>
+          </div>
+        </div>
       </div>
     </div>
 
-    <button id="allOffBtn">All OFF</button>
-    <button id="logoutBtn">Logout</button>
+    <div class="footer">
+      IoT Window Shading System for Thermal Comfort • Tech StudyCell
+    </div>
   </div>
-
-  <footer>
-    Created by Tech StudyCell
-  </footer>
 
   <!-- Firebase SDKs -->
   <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-app-compat.js"></script>
@@ -195,23 +470,41 @@
   <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-auth-compat.js"></script>
 
   <script>
-    // Firebase config
+    // Firebase config (using your existing config)
     const firebaseConfig = {
-    apiKey: "AIzaSyCA7QhE7fMkdCpOnmANBGXKNDy3HXCtAo0",
-    authDomain: "esp-slidingwindow.firebaseapp.com",
-    databaseURL: "https://esp-slidingwindow-default-rtdb.asia-southeast1.firebasedatabase.app",
-    projectId: "esp-slidingwindow",
-    storageBucket: "esp-slidingwindow.firebasestorage.app",
-    messagingSenderId: "745762327246",
-    appId: "1:745762327246:web:5ef34612c7b060d57ade9f",
-    measurementId: "G-4V16TCZSE9"
-};
+      apiKey: "AIzaSyCA7QhE7fMkdCpOnmANBGXKNDy3HXCtAo0",
+      authDomain: "esp-slidingwindow.firebaseapp.com",
+      databaseURL: "https://esp-slidingwindow-default-rtdb.asia-southeast1.firebasedatabase.app",
+      projectId: "esp-slidingwindow",
+      storageBucket: "esp-slidingwindow.firebasestorage.app",
+      messagingSenderId: "745762327246",
+      appId: "1:745762327246:web:5ef34612c7b060d57ade9f",
+      measurementId: "G-4V16TCZSE9"
+    };
+    
     firebase.initializeApp(firebaseConfig);
 
-    const loginForm = document.getElementById("loginForm");
+    // DOM Elements
+    const loginScreen = document.getElementById("loginScreen");
     const dashboard = document.getElementById("dashboard");
     const loginBtn = document.getElementById("loginBtn");
+    const logoutBtn = document.getElementById("logoutBtn");
+    const openBtn = document.getElementById("openBtn");
+    const closeBtn = document.getElementById("closeBtn");
+    const applyBtn = document.getElementById("applyBtn");
+    const positionSlider = document.getElementById("positionSlider");
+    const sliderValue = document.getElementById("sliderValue");
+    
+    // Status displays
+    const shadePosition = document.getElementById("shadePosition");
+    const motorStatus = document.getElementById("motorStatus");
+    const temperatureDisplay = document.getElementById("temperatureDisplay");
+    const lightLevel = document.getElementById("lightLevel");
 
+    let currentPosition = 50;
+    let isMoving = false;
+
+    // Login functionality
     loginBtn.addEventListener("click", () => {
       const email = document.getElementById("email").value.trim();
       const password = document.getElementById("password").value;
@@ -224,62 +517,153 @@
       firebase.auth().signInWithEmailAndPassword(email, password)
         .then(userCredential => {
           console.log("Signed in as", userCredential.user.email);
-          loginForm.style.display = "none";
-          dashboard.style.display = "block";
-          startRelayControl();
+          showDashboard();
+          initializeControls();
         })
         .catch(error => {
           alert("Login failed: " + error.message);
         });
     });
 
-    function startRelayControl() {
-      const db = firebase.database();
-
-      const relays = [
-        { id: 1, path: "relay1" },
-        { id: 2, path: "relay2" },
-        { id: 3, path: "relay3" },
-        { id: 4, path: "relay4" },
-      ];
-
-      relays.forEach(relay => {
-        const statusText = document.getElementById(`status${relay.id}`);
-        const toggleButton = document.getElementById(`btn${relay.id}`);
-        const relayRef = db.ref("/" + relay.path);
-
-        relayRef.on("value", (snapshot) => {
-          const state = snapshot.val();
-          statusText.innerText = state ? "ON" : "OFF";
-          toggleButton.style.backgroundColor = state ? "green" : "blue";
-        });
-
-        toggleButton.onclick = () => {
-          relayRef.get().then(snap => {
-            relayRef.set(!snap.val());
-          });
-        };
-      });
-
-      document.getElementById("allOffBtn").onclick = () => {
-        relays.forEach(relay => {
-          db.ref("/" + relay.path).set(false);
-        });
-      };
+    // Show dashboard
+    function showDashboard() {
+      loginScreen.classList.add("hidden");
+      dashboard.classList.remove("hidden");
     }
 
-    document.getElementById("logoutBtn").onclick = () => {
+    // Initialize controls
+    function initializeControls() {
+      const db = firebase.database();
+      
+      // Listen for position changes from Firebase
+      const positionRef = db.ref("/windowPosition");
+      const motorRef = db.ref("/motorStatus");
+      const temperatureRef = db.ref("/temperature");
+      
+      positionRef.on("value", (snapshot) => {
+        const position = snapshot.val() || 50;
+        updatePosition(position);
+      });
+      
+      motorRef.on("value", (snapshot) => {
+        const status = snapshot.val() || "idle";
+        motorStatus.textContent = status.charAt(0).toUpperCase() + status.slice(1);
+        isMoving = status === "moving";
+        
+        // Disable buttons while moving
+        openBtn.disabled = isMoving;
+        closeBtn.disabled = isMoving;
+        applyBtn.disabled = isMoving;
+        
+        if (isMoving) {
+          openBtn.style.opacity = "0.6";
+          closeBtn.style.opacity = "0.6";
+          applyBtn.style.opacity = "0.6";
+        } else {
+          openBtn.style.opacity = "1";
+          closeBtn.style.opacity = "1";
+          applyBtn.style.opacity = "1";
+        }
+      });
+      
+      temperatureRef.on("value", (snapshot) => {
+        const temp = snapshot.val() || 24;
+        temperatureDisplay.textContent = temp + "°C";
+        
+        // Update light level based on position
+        updateLightLevel(currentPosition);
+      });
+
+      // Button event listeners
+      openBtn.addEventListener("click", () => {
+        if (!isMoving) {
+          db.ref("/windowCommand").set("open");
+        }
+      });
+
+      closeBtn.addEventListener("click", () => {
+        if (!isMoving) {
+          db.ref("/windowCommand").set("close");
+        }
+      });
+
+      applyBtn.addEventListener("click", () => {
+        if (!isMoving) {
+          const targetPosition = parseInt(positionSlider.value);
+          db.ref("/windowCommand").set("manual");
+          db.ref("/targetPosition").set(targetPosition);
+        }
+      });
+
+      // Slider event listener
+      positionSlider.addEventListener("input", (e) => {
+        sliderValue.textContent = e.target.value + "%";
+        updateSliderGradient(e.target.value);
+      });
+
+      // Initialize slider
+      updateSliderGradient(50);
+    }
+
+    // Update position display
+    function updatePosition(position) {
+      currentPosition = position;
+      shadePosition.textContent = position + "%";
+      positionSlider.value = position;
+      sliderValue.textContent = position + "%";
+      updateSliderGradient(position);
+      updateLightLevel(position);
+    }
+
+    // Update slider gradient
+    function updateSliderGradient(value) {
+      const percentage = (value / 100) * 100;
+      positionSlider.style.background = `linear-gradient(to right, #667eea 0%, #667eea ${percentage}%, #e2e8f0 ${percentage}%, #e2e8f0 100%)`;
+    }
+
+    // Update light level based on shade position
+    function updateLightLevel(position) {
+      let level;
+      if (position < 25) {
+        level = "High";
+      } else if (position < 75) {
+        level = "Medium";
+      } else {
+        level = "Low";
+      }
+      lightLevel.textContent = level;
+    }
+
+    // Logout functionality
+    logoutBtn.addEventListener("click", () => {
       firebase.auth().signOut()
         .then(() => {
-          dashboard.style.display = "none";
-          loginForm.style.display = "block";
+          dashboard.classList.add("hidden");
+          loginScreen.classList.remove("hidden");
           document.getElementById("email").value = "";
           document.getElementById("password").value = "";
         })
         .catch(error => {
           alert("Logout failed: " + error.message);
         });
-    };
+    });
+
+    // Simulate real-time data updates (for demo purposes)
+    function simulateDataUpdates() {
+      setInterval(() => {
+        if (firebase.auth().currentUser && !isMoving) {
+          // Simulate temperature fluctuations
+          const baseTemp = 24;
+          const variation = Math.sin(Date.now() / 10000) * 3;
+          const currentTemp = Math.round((baseTemp + variation) * 10) / 10;
+          
+          firebase.database().ref("/temperature").set(currentTemp);
+        }
+      }, 5000);
+    }
+
+    // Start simulations
+    simulateDataUpdates();
   </script>
 </body>
 </html>
