@@ -23,7 +23,7 @@
         }
 
         .container {
-            max-width: 800px;
+            max-width: 1000px;
             margin: 0 auto;
             background: rgba(255, 255, 255, 0.95);
             border-radius: 20px;
@@ -139,7 +139,7 @@
 
         .status-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
             gap: 20px;
             margin-bottom: 30px;
         }
@@ -159,14 +159,30 @@
         }
 
         .status-card h3 {
-            font-size: 1.2rem;
+            font-size: 1rem;
             margin-bottom: 10px;
             opacity: 0.9;
         }
 
         .status-value {
-            font-size: 2rem;
+            font-size: 1.8rem;
             font-weight: bold;
+        }
+
+        .status-card.temperature {
+            background: linear-gradient(135deg, #fa709a 0%, #fee140 100%);
+        }
+
+        .status-card.light {
+            background: linear-gradient(135deg, #ffd89b 0%, #19547b 100%);
+        }
+
+        .status-card.indoor-temp {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+
+        .status-card.outdoor-temp {
+            background: linear-gradient(135deg, #30cfd0 0%, #330867 100%);
         }
 
         .controls-grid {
@@ -362,6 +378,12 @@
             background: rgba(255, 255, 255, 0.3);
         }
 
+        .sensor-status {
+            font-size: 0.8rem;
+            opacity: 0.8;
+            margin-top: 5px;
+        }
+
         .hidden {
             display: none;
         }
@@ -428,17 +450,24 @@
                     <h3>Window Position</h3>
                     <div class="status-value" id="windowPosition">50%</div>
                 </div>
-                <div class="status-card">
-                    <h3>Temperature</h3>
-                    <div class="status-value" id="temperatureDisplay">24.0°C</div>
+                <div class="status-card indoor-temp">
+                    <h3>Indoor Temp</h3>
+                    <div class="status-value" id="temperatureIndoor">--°C</div>
+                    <div class="sensor-status" id="indoorSensorStatus">Checking...</div>
+                </div>
+                <div class="status-card outdoor-temp">
+                    <h3>Outdoor Temp</h3>
+                    <div class="status-value" id="temperatureOutdoor">--°C</div>
+                    <div class="sensor-status" id="outdoorSensorStatus">Checking...</div>
                 </div>
                 <div class="status-card">
                     <h3>Motor Status</h3>
                     <div class="status-value" id="motorStatus">Idle</div>
                 </div>
-                <div class="status-card">
-                    <h3>Light Level</h3>
-                    <div class="status-value" id="lightLevel">Medium</div>
+                <div class="status-card light">
+                    <h3>💡 Light Level</h3>
+                    <div class="status-value" id="lightLevel">--</div>
+                    <div class="sensor-status" id="lightCondition">--</div>
                 </div>
             </div>
 
@@ -548,10 +577,15 @@
             const initialData = {
                 windowPosition: 50,
                 motorStatus: "idle",
-                temperature: 24.0,
+                temperatureIndoor: 0.0,
+                temperatureOutdoor: 0.0,
                 windowCommand: "none",
                 targetPosition: 50,
-                lightLevel: 500,
+                lightLevel: 50,
+                lightRawValue: 512,
+                lightCondition: "moderate",
+                dhtIndoorAvailable: false,
+                dhtOutdoorAvailable: false,
                 lastUpdate: firebase.database.ServerValue.TIMESTAMP
             };
 
@@ -579,7 +613,6 @@
                 const position = snapshot.val();
                 if (position !== null) {
                     updateWindowPosition(position);
-                    showNotification(`Window position: ${position}%`, 'info', 2000);
                 }
             }, (error) => {
                 console.error('Position listener error:', error);
@@ -599,19 +632,47 @@
                 }
             });
 
-            // Temperature Listener
-            realtimeListeners.temperature = database.ref('/temperature').on('value', (snapshot) => {
+            // Indoor Temperature Listener
+            realtimeListeners.tempIndoor = database.ref('/temperatureIndoor').on('value', (snapshot) => {
                 const temp = snapshot.val();
                 if (temp !== null) {
-                    updateTemperature(temp);
+                    updateTemperatureIndoor(temp);
                 }
             });
 
-            // Light Level Listener
+            // Outdoor Temperature Listener
+            realtimeListeners.tempOutdoor = database.ref('/temperatureOutdoor').on('value', (snapshot) => {
+                const temp = snapshot.val();
+                if (temp !== null) {
+                    updateTemperatureOutdoor(temp);
+                }
+            });
+
+            // Indoor Sensor Status Listener
+            realtimeListeners.indoorAvail = database.ref('/dhtIndoorAvailable').on('value', (snapshot) => {
+                const available = snapshot.val();
+                updateSensorStatus('indoor', available);
+            });
+
+            // Outdoor Sensor Status Listener
+            realtimeListeners.outdoorAvail = database.ref('/dhtOutdoorAvailable').on('value', (snapshot) => {
+                const available = snapshot.val();
+                updateSensorStatus('outdoor', available);
+            });
+
+            // Light Level Listener (0-100%)
             realtimeListeners.light = database.ref('/lightLevel').on('value', (snapshot) => {
                 const lightLevel = snapshot.val();
                 if (lightLevel !== null) {
                     updateLightLevel(lightLevel);
+                }
+            });
+
+            // Light Condition Listener
+            realtimeListeners.lightCondition = database.ref('/lightCondition').on('value', (snapshot) => {
+                const condition = snapshot.val();
+                if (condition) {
+                    updateLightCondition(condition);
                 }
             });
 
@@ -620,17 +681,20 @@
 
         // Remove listeners when logging out
         function removeRealtimeListeners() {
+            const refPaths = {
+                position: '/windowPosition',
+                motor: '/motorStatus',
+                tempIndoor: '/temperatureIndoor',
+                tempOutdoor: '/temperatureOutdoor',
+                indoorAvail: '/dhtIndoorAvailable',
+                outdoorAvail: '/dhtOutdoorAvailable',
+                light: '/lightLevel',
+                lightCondition: '/lightCondition'
+            };
+
             Object.keys(realtimeListeners).forEach(key => {
                 if (realtimeListeners[key]) {
-                    let refPath;
-                    switch(key) {
-                        case 'position': refPath = '/windowPosition'; break;
-                        case 'motor': refPath = '/motorStatus'; break;
-                        case 'temperature': refPath = '/temperature'; break;
-                        case 'light': refPath = '/lightLevel'; break;
-                        default: refPath = `/${key}`;
-                    }
-                    database.ref(refPath).off('value', realtimeListeners[key]);
+                    database.ref(refPaths[key]).off('value', realtimeListeners[key]);
                 }
             });
             realtimeListeners = {};
@@ -667,22 +731,52 @@
             });
         }
 
-        function updateTemperature(temp) {
-            const tempElement = document.getElementById('temperatureDisplay');
+        function updateTemperatureIndoor(temp) {
+            const tempElement = document.getElementById('temperatureIndoor');
             if (tempElement) {
-                tempElement.textContent = parseFloat(temp).toFixed(1) + '°C';
+                if (temp > 0) {
+                    tempElement.textContent = parseFloat(temp).toFixed(1) + '°C';
+                } else {
+                    tempElement.textContent = '--°C';
+                }
+            }
+        }
+
+        function updateTemperatureOutdoor(temp) {
+            const tempElement = document.getElementById('temperatureOutdoor');
+            if (tempElement) {
+                if (temp > 0) {
+                    tempElement.textContent = parseFloat(temp).toFixed(1) + '°C';
+                } else {
+                    tempElement.textContent = '--°C';
+                }
+            }
+        }
+
+        function updateSensorStatus(type, available) {
+            const statusElement = document.getElementById(type + 'SensorStatus');
+            if (statusElement) {
+                if (available) {
+                    statusElement.textContent = '✓ Connected';
+                    statusElement.style.color = '#48bb78';
+                } else {
+                    statusElement.textContent = '✗ Not Available';
+                    statusElement.style.color = '#f56565';
+                }
             }
         }
 
         function updateLightLevel(lightValue) {
             const lightElement = document.getElementById('lightLevel');
             if (lightElement) {
-                let levelText;
-                if (lightValue < 300) levelText = 'Low';
-                else if (lightValue < 700) levelText = 'Medium';
-                else levelText = 'High';
-                
-                lightElement.textContent = levelText;
+                lightElement.textContent = lightValue + '%';
+            }
+        }
+
+        function updateLightCondition(condition) {
+            const conditionElement = document.getElementById('lightCondition');
+            if (conditionElement) {
+                conditionElement.textContent = condition.charAt(0).toUpperCase() + condition.slice(1);
             }
         }
 
