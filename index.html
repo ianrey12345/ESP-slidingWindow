@@ -582,13 +582,15 @@
             <div class="slider-container">
                 <div class="slider-info">
                     <span>Servo Angle:</span>
-                    <span class="position-display" id="servoAngleValue">90°</span>
+                    <span class="position-display" id="servoAngleValue">360°</span>
                 </div>
-                <input type="range" min="0" max="180" value="90" class="slider" id="servoSlider">
+                <input type="range" min="0" max="720" value="360" class="slider" id="servoSlider">
                 <div style="display: flex; justify-content: space-between; font-size: 0.9rem; color: #666; margin-top: 10px;">
                     <span>0°</span>
-                    <span>90°</span>
                     <span>180°</span>
+                    <span>360°</span>
+                    <span>540°</span>
+                    <span>720°</span>
                 </div>
             </div>
             <button id="applyServoBtn" class="control-button">Apply Servo Angle</button>
@@ -1168,7 +1170,7 @@
         function updateServoSliderGradient(value) {
             const slider = document.getElementById('servoSlider');
             if (slider) {
-                const percentage = (value / 180) * 100;
+                const percentage = (value / 720) * 100;
                 slider.style.background = `linear-gradient(to right, #667eea 0%, #667eea ${percentage}%, #e2e8f0 ${percentage}%, #e2e8f0 100%)`;
             }
         }
