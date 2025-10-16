@@ -208,7 +208,15 @@
             justify-content: center;
             gap: 10px;
         }
-
+        
+        .servo-angle-display {
+            text-align: center;
+            font-size: 3rem;
+            font-weight: bold;
+            color: #667eea;
+            margin: 10px 0;
+        }
+        
         .control-button:hover {
             transform: translateY(-3px);
             box-shadow: 0 15px 30px rgba(0, 0, 0, 0.2);
@@ -324,6 +332,51 @@
             margin-bottom: 8px;
             color: #4a5568;
             font-weight: 500;
+        }
+
+        .switch {
+            position: relative;
+            display: inline-block;
+            width: 60px;
+            height: 34px;
+        }
+
+        .switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .switch-slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #ccc;
+            transition: .4s;
+            border-radius: 34px;
+        }
+
+        .switch-slider:before {
+            position: absolute;
+            content: "";
+            height: 26px;
+            width: 26px;
+            left: 4px;
+            bottom: 4px;
+            background-color: white;
+            transition: .4s;
+            border-radius: 50%;
+        }
+
+        .switch input:checked + .switch-slider {
+            background-color: #667eea;
+        }
+
+        .switch input:checked + .switch-slider:before {
+            transform: translateX(26px);
         }
 
         .form-group input {
@@ -471,6 +524,30 @@
                 </div>
             </div>
 
+            <!-- Auto Control Section -->
+            <div class="manual-control">
+                <h3>🤖 Automatic Control Settings</h3>
+                <div style="display: grid; gap: 15px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; padding: 15px; background: rgba(102, 126, 234, 0.05); border-radius: 10px;">
+                        <span style="font-weight: 500;">Temperature-Based Control</span>
+                        <label class="switch">
+                            <input type="checkbox" id="autoTempToggle">
+                            <span class="switch-slider"></span>
+                        </label>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; align-items: center; padding: 15px; background: rgba(102, 126, 234, 0.05); border-radius: 10px;">
+                        <span style="font-weight: 500;">Light-Based Control</span>
+                        <label class="switch">
+                            <input type="checkbox" id="autoLightToggle">
+                            <span class="switch-slider"></span>
+                        </label>
+                    </div>
+                    <div id="controlModeDisplay" style="text-align: center; padding: 10px; background: #667eea; color: white; border-radius: 10px; font-weight: bold;">
+                        Mode: Manual
+                    </div>
+                </div>
+            </div>
+
             <!-- Control Buttons -->
             <div class="controls-grid">
                 <button id="openBtn" class="control-button open">
@@ -499,6 +576,51 @@
             </div>
         </div>
     </div>
+    <!-- Servo Motor Control -->
+        <div class="manual-control">
+            <h3>🔧 Servo Motor Control</h3>
+            <div class="slider-container">
+                <div class="slider-info">
+                    <span>Servo Angle:</span>
+                    <span class="position-display" id="servoAngleValue">90°</span>
+                </div>
+                <input type="range" min="0" max="180" value="90" class="slider" id="servoSlider">
+                <div style="display: flex; justify-content: space-between; font-size: 0.9rem; color: #666; margin-top: 10px;">
+                    <span>0°</span>
+                    <span>90°</span>
+                    <span>180°</span>
+                </div>
+            </div>
+            <button id="applyServoBtn" class="control-button">Apply Servo Angle</button>
+        </div>
+
+        <!-- Activity Log -->
+        <div class="manual-control">
+            <h3>📋 Activity Log</h3>
+            <div id="activityLog" style="max-height: 200px; overflow-y: auto; background: rgba(102, 126, 234, 0.05); padding: 15px; border-radius: 10px;">
+                <div style="color: #999; text-align: center;">No recent activity</div>
+            </div>
+        </div>
+
+        <!-- Temperature Thresholds -->
+        <div class="manual-control">
+            <h3>🌡️ Temperature Thresholds</h3>
+            <div style="display: grid; gap: 15px;">
+                <div>
+                    <label style="display: block; margin-bottom: 8px; font-weight: 500;">Close Window Above:</label>
+                    <input type="number" id="tempCloseThreshold" step="0.5" value="29.5" 
+                        style="width: 100%; padding: 10px; border: 2px solid #e2e8f0; border-radius: 8px;">
+                    <span style="font-size: 0.85rem; color: #666;">°C</span>
+                </div>
+                <div>
+                    <label style="display: block; margin-bottom: 8px; font-weight: 500;">Open Window Below:</label>
+                    <input type="number" id="tempOpenThreshold" step="0.5" value="29.0" 
+                        style="width: 100%; padding: 10px; border: 2px solid #e2e8f0; border-radius: 8px;">
+                    <span style="font-size: 0.85rem; color: #666;">°C</span>
+                </div>
+                <button id="applyThresholdsBtn" class="control-button">Apply Thresholds</button>
+            </div>
+        </div>
 
     <script>
         // Firebase configuration
@@ -632,6 +754,46 @@
                 }
             });
 
+            // In setupRealtimeListeners()
+            realtimeListeners.tempClose = database.ref('/tempCloseThreshold').on('value', (snapshot) => {
+                const value = snapshot.val();
+                const input = document.getElementById('tempCloseThreshold');
+                if (input && value) input.value = value;
+            });
+
+            realtimeListeners.tempOpen = database.ref('/tempOpenThreshold').on('value', (snapshot) => {
+                const value = snapshot.val();
+                const input = document.getElementById('tempOpenThreshold');
+                if (input && value) input.value = value;
+            });
+
+            // In setupControlListeners()
+            document.getElementById('applyThresholdsBtn').addEventListener('click', () => {
+                const closeThreshold = parseFloat(document.getElementById('tempCloseThreshold').value);
+                const openThreshold = parseFloat(document.getElementById('tempOpenThreshold').value);
+                
+                if (closeThreshold <= openThreshold) {
+                    showNotification('Close threshold must be higher than open threshold', 'error');
+                    return;
+                }
+                
+                Promise.all([
+                    database.ref('/tempCloseThreshold').set(closeThreshold),
+                    database.ref('/tempOpenThreshold').set(openThreshold)
+                ]).then(() => {
+                    showNotification('Temperature thresholds updated', 'success');
+                    addActivityLog(`Thresholds: Close>${closeThreshold}°C, Open<${openThreshold}°C`, 'success');
+                });
+            });
+
+            // Servo Angle Listener
+            realtimeListeners.servo = database.ref('/servoAngle').on('value', (snapshot) => {
+                const angle = snapshot.val();
+                if (angle !== null) {
+                    updateServoAngle(angle);
+                }
+            });
+
             // Indoor Temperature Listener
             realtimeListeners.tempIndoor = database.ref('/temperatureIndoor').on('value', (snapshot) => {
                 const temp = snapshot.val();
@@ -677,6 +839,48 @@
             });
 
             console.log('Real-time listeners setup complete');
+
+                        // In setupRealtimeListeners()
+            realtimeListeners.autoTemp = database.ref('/autoTempControl').on('value', (snapshot) => {
+                const enabled = snapshot.val();
+                const toggle = document.getElementById('autoTempToggle');
+                if (toggle) toggle.checked = enabled;
+            });
+
+            realtimeListeners.autoLight = database.ref('/autoLightControl').on('value', (snapshot) => {
+                const enabled = snapshot.val();
+                const toggle = document.getElementById('autoLightToggle');
+                if (toggle) toggle.checked = enabled;
+            });
+
+            realtimeListeners.controlMode = database.ref('/controlMode').on('value', (snapshot) => {
+                const mode = snapshot.val();
+                const display = document.getElementById('controlModeDisplay');
+                if (display && mode) {
+                    display.textContent = `Mode: ${mode.replace('_', ' ').toUpperCase()}`;
+                }
+            });
+
+            // In setupControlListeners()
+            document.getElementById('autoTempToggle').addEventListener('change', (e) => {
+                database.ref('/autoTempControl').set(e.target.checked);
+                if (e.target.checked) {
+                    database.ref('/windowCommand').set('auto_temp');
+                    showNotification('Temperature control enabled', 'success');
+                } else {
+                    showNotification('Temperature control disabled', 'info');
+                }
+            });
+
+            document.getElementById('autoLightToggle').addEventListener('change', (e) => {
+                database.ref('/autoLightControl').set(e.target.checked);
+                if (e.target.checked) {
+                    database.ref('/windowCommand').set('auto_light');
+                    showNotification('Light control enabled', 'success');
+                } else {
+                    showNotification('Light control disabled', 'info');
+                }
+            });
         }
 
         // Remove listeners when logging out
@@ -788,6 +992,66 @@
             }
         }
 
+        let activityLog = [];
+
+        function addActivityLog(message, type = 'info') {
+            const timestamp = new Date().toLocaleTimeString();
+            const logEntry = {
+                time: timestamp,
+                message: message,
+                type: type
+            };
+            
+            activityLog.unshift(logEntry);
+            if (activityLog.length > 20) activityLog.pop();
+            
+            updateActivityLogDisplay();
+        }
+
+        function updateActivityLogDisplay() {
+            const logContainer = document.getElementById('activityLog');
+            if (!logContainer) return;
+            
+            if (activityLog.length === 0) {
+                logContainer.innerHTML = '<div style="color: #999; text-align: center;">No recent activity</div>';
+                return;
+            }
+            
+            logContainer.innerHTML = activityLog.map(entry => {
+                const colors = {
+                    info: '#667eea',
+                    success: '#48bb78',
+                    warning: '#ed8936',
+                    error: '#f56565'
+                };
+                return `
+                    <div style="padding: 8px; margin-bottom: 5px; border-left: 3px solid ${colors[entry.type]}; background: white; border-radius: 5px;">
+                        <span style="color: #999; font-size: 0.85rem;">${entry.time}</span>
+                        <span style="margin-left: 10px;">${entry.message}</span>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        // Add this in your existing functions to log activities
+        // For example, in sendCommand():
+        function sendCommand(command) {
+            if (!isConnected) {
+                showNotification('No connection to Firebase', 'error');
+                return;
+            }
+
+            database.ref('/windowCommand').set(command)
+                .then(() => {
+                    showNotification(`Command sent: ${command.toUpperCase()}`, 'success');
+                    addActivityLog(`Window command: ${command.toUpperCase()}`, 'success');
+                })
+                .catch((error) => {
+                    showNotification('Failed to send command: ' + error.message, 'error');
+                    addActivityLog(`Failed: ${error.message}`, 'error');
+                });
+        }
+
         // Authentication
         document.getElementById('loginBtn').addEventListener('click', () => {
             const email = document.getElementById('email').value.trim();
@@ -862,6 +1126,18 @@
                 document.getElementById('sliderValue').textContent = value + '%';
                 updateSliderGradient(value);
             });
+
+            // Servo Control
+            document.getElementById('applyServoBtn').addEventListener('click', () => {
+                const targetAngle = parseInt(document.getElementById('servoSlider').value);
+                sendServoCommand(targetAngle);
+            });
+
+            document.getElementById('servoSlider').addEventListener('input', (e) => {
+                const value = e.target.value;
+                document.getElementById('servoAngleValue').textContent = value + '°';
+                updateServoSliderGradient(value);
+            });
         }
 
         function sendCommand(command) {
@@ -876,6 +1152,39 @@
                 })
                 .catch((error) => {
                     showNotification('Failed to send command: ' + error.message, 'error');
+                });
+        }
+
+        function updateServoAngle(angle) {
+            const servoElement = document.getElementById('servoAngleValue');
+            const slider = document.getElementById('servoSlider');
+            
+            if (servoElement) servoElement.textContent = angle + '°';
+            if (slider) slider.value = angle;
+            
+            updateServoSliderGradient(angle);
+        }
+
+        function updateServoSliderGradient(value) {
+            const slider = document.getElementById('servoSlider');
+            if (slider) {
+                const percentage = (value / 180) * 100;
+                slider.style.background = `linear-gradient(to right, #667eea 0%, #667eea ${percentage}%, #e2e8f0 ${percentage}%, #e2e8f0 100%)`;
+            }
+        }
+
+        function sendServoCommand(angle) {
+            if (!isConnected) {
+                showNotification('No connection to Firebase', 'error');
+                return;
+            }
+
+            database.ref('/targetServoAngle').set(angle)
+                .then(() => {
+                    showNotification(`Servo moving to: ${angle}°`, 'success');
+                })
+                .catch((error) => {
+                    showNotification('Failed to send servo command: ' + error.message, 'error');
                 });
         }
 
@@ -916,3 +1225,4 @@
     </script>
 </body>
 </html>
+
