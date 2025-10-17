@@ -645,6 +645,10 @@
         let isConnected = false;
         let currentUser = null;
         let realtimeListeners = {};
+        let inactivityTimer = null;
+        let sessionTimeout = null;
+        const INACTIVITY_TIMEOUT = 60 * 60 * 1000; // 1 hour in milliseconds
+        const SESSION_TIMEOUT = 60 * 60 * 1000; // 1 hour session limit
 
         // DOM Elements
         const loginScreen = document.getElementById('loginScreen');
@@ -1227,5 +1231,6 @@
     </script>
 </body>
 </html>
+
 
 
