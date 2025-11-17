@@ -447,4 +447,222 @@ body {
     .header h1 {
         font-size: 2rem;
     }
+
+}
+
+@media (max-width: 480px) and (orientation: portrait) {
+    body {
+        padding: 10px;
+    }
+
+    .container {
+        padding: 15px;
+        margin: 0;
+        border-radius: 15px;
+    }
+
+    /* Header adjustments */
+    .header h1 {
+        font-size: 1.5rem;
+        margin-bottom: 5px;
+    }
+
+    .header p {
+        font-size: 0.85rem;
+    }
+
+    /* Connection status - make smaller */
+    .connection-status {
+        top: 10px;
+        left: 10px;
+        padding: 6px 10px;
+        font-size: 0.75rem;
+    }
+
+    /* Notification - adjust position */
+    .notification {
+        top: 10px;
+        right: 10px;
+        left: 10px;
+        max-width: none;
+        font-size: 0.85rem;
+    }
+
+    /* Logout button - make smaller */
+    .logout-btn {
+        top: 10px;
+        right: 10px;
+        padding: 6px 12px;
+        font-size: 0.85rem;
+    }
+
+    /* Status cards - single column, compact */
+    .status-grid {
+        grid-template-columns: 1fr;
+        gap: 12px;
+        margin-bottom: 20px;
+    }
+
+    .status-card {
+        padding: 15px;
+    }
+
+    .status-card h3 {
+        font-size: 0.9rem;
+        margin-bottom: 8px;
+    }
+
+    .status-value {
+        font-size: 1.5rem;
+    }
+
+    /* Control buttons - stack vertically */
+    .controls-grid {
+        grid-template-columns: 1fr;
+        gap: 12px;
+        margin-bottom: 20px;
+    }
+
+    .control-button {
+        padding: 15px;
+        font-size: 1rem;
+    }
+
+    /* Manual and Servo controls - stack vertically */
+    div[style*="grid-template-columns: 1fr 1fr"] {
+        display: grid !important;
+        grid-template-columns: 1fr !important;
+        gap: 15px !important;
+    }
+
+    /* Manual control sections */
+    .manual-control {
+        padding: 15px;
+        margin-bottom: 15px;
+    }
+
+    .manual-control h3 {
+        font-size: 1.1rem;
+        margin-bottom: 15px;
+    }
+
+    /* Slider adjustments */
+    .slider-info {
+        font-size: 0.9rem;
+    }
+
+    .position-display {
+        padding: 6px 12px;
+        font-size: 0.9rem;
+    }
+
+    .slider {
+        height: 6px;
+    }
+
+    .slider::-webkit-slider-thumb {
+        width: 20px;
+        height: 20px;
+    }
+
+    /* Slider range labels */
+    .slider-container div[style*="display: flex"] {
+        font-size: 0.75rem !important;
+        margin-top: 8px !important;
+    }
+
+    /* Servo angle display */
+    .servo-angle-display {
+        font-size: 2rem;
+    }
+
+    /* Auto control and threshold sections - stack */
+    div[style*="display: grid"][style*="gap: 20px"] {
+        display: grid !important;
+        grid-template-columns: 1fr !important;
+        gap: 15px !important;
+    }
+
+    /* Temperature threshold inputs */
+    input[type="number"] {
+        padding: 8px !important;
+        font-size: 0.9rem;
+    }
+
+    /* Control mode display */
+    #controlModeDisplay {
+        font-size: 0.9rem;
+        padding: 8px !important;
+    }
+
+    /* Auto control toggle sections */
+    .manual-control > div > div[style*="padding: 15px"] {
+        padding: 12px !important;
+        font-size: 0.9rem;
+    }
+
+    /* Activity log */
+    #activityLog {
+        max-height: 150px !important;
+        padding: 10px !important;
+        font-size: 0.85rem;
+    }
+
+    /* Login form adjustments */
+    .login-form {
+        padding: 25px;
+        margin: 10px;
+    }
+
+    .login-form h2 {
+        font-size: 1.5rem;
+        margin-bottom: 20px;
+    }
+
+    .form-group input {
+        padding: 12px;
+        font-size: 0.95rem;
+    }
+
+    .login-btn {
+        padding: 12px;
+        font-size: 1rem;
+    }
+}
+
+/* Small Portrait Devices (up to 360px) */
+@media (max-width: 360px) and (orientation: portrait) {
+    .header h1 {
+        font-size: 1.3rem;
+    }
+
+    .status-value {
+        font-size: 1.3rem;
+    }
+
+    .control-button {
+        font-size: 0.9rem;
+        padding: 12px;
+    }
+
+    .manual-control h3 {
+        font-size: 1rem;
+    }
+
+    .slider-container div[style*="display: flex"] {
+        flex-direction: column !important;
+        align-items: flex-start !important;
+        gap: 5px;
+    }
+}
+
+/* Landscape orientation adjustments (optional) */
+@media (max-width: 768px) and (orientation: landscape) {
+    .status-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+    .controls-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
 }
