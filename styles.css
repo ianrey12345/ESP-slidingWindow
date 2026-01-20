@@ -631,7 +631,7 @@ body {
 }
 
 /* Small Portrait Devices (up to 360px) */
-@media (max-width: 560px) and (orientation: portrait) {
+@media (max-width: 360px) and (orientation: portrait) {
     .header h1 {
         font-size: 1.3rem;
     }
@@ -666,4 +666,5 @@ body {
         grid-template-columns: repeat(2, 1fr);
     }
 }
+
 
