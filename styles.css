@@ -447,7 +447,6 @@ body {
     .header h1 {
         font-size: 2rem;
     }
-
 }
 
 @media (max-width: 480px) and (orientation: portrait) {
@@ -630,6 +629,23 @@ body {
     }
 }
 
+    .mobile-header {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(10px);
+    padding: 10px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    z-index: 999;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
 /* Small Portrait Devices (up to 360px) */
 @media (max-width: 360px) and (orientation: portrait) {
     .header h1 {
@@ -667,4 +683,136 @@ body {
     }
 }
 
+.online-users-badge {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    background: rgba(102, 126, 234, 0.1);
+    padding: 8px 12px;
+    border-radius: 20px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: #667eea;
+    white-space: nowrap;
+}
 
+/* Top bar layout for better mobile organization */
+.top-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.top-bar-left {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    flex: 1;
+}
+
+.top-bar-right {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+}
+
+/* Mobile adjustments for tablets and phones */
+@media (max-width: 768px) {
+    body {
+        padding-top: 70px; /* Space for fixed header */
+    }
+    
+    /* Update logout button for mobile */
+    .logout-btn {
+        position: relative !important;
+        top: 0 !important;
+        right: 0 !important;
+        padding: 8px 15px;
+        font-size: 0.85rem;
+        margin: 0;
+    }
+    
+    /* Connection status for mobile */
+    .connection-status {
+        position: relative !important;
+        top: 0 !important;
+        left: 0 !important;
+        padding: 8px 12px;
+        font-size: 0.75rem;
+        margin: 0;
+    }
+    
+    /* Online users badge for mobile */
+    .online-users-badge {
+        padding: 6px 10px;
+        font-size: 0.75rem;
+    }
+    
+    /* Create space at top of page */
+    .container {
+        margin-top: 10px;
+    }
+    
+    /* Stack connection status and buttons horizontally */
+    .top-bar {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 15px;
+        gap: 10px;
+        flex-wrap: wrap;
+    }
+    
+    .top-bar-left {
+        display: flex;
+        gap: 10px;
+        align-items: center;
+        flex: 1;
+    }
+    
+    .top-bar-right {
+        display: flex;
+        gap: 10px;
+        align-items: center;
+    }
+}
+
+/* Extra small devices - make everything more compact */
+@media (max-width: 480px) {
+    .logout-btn {
+        padding: 6px 10px !important;
+        font-size: 0.75rem !important;
+        border-radius: 15px;
+    }
+    
+    .connection-status {
+        padding: 6px 10px !important;
+        font-size: 0.7rem !important;
+        border-radius: 15px;
+    }
+    
+    .online-users-badge {
+        padding: 5px 8px;
+        font-size: 0.7rem;
+    }
+    
+    /* Reduce emoji/icon size if needed */
+    .online-users-badge span:first-child {
+        font-size: 0.9rem;
+    }
+    
+    /* Make top bar stack on very small screens */
+    .top-bar {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    
+    .top-bar-left,
+    .top-bar-right {
+        justify-content: center;
+        width: 100%;
+    }
+}
