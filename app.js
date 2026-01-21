@@ -19,7 +19,7 @@ let isConnected = false;
 let currentUser = null;
 let realtimeListeners = {};
 let inactivityTimer = null;
-const INACTIVITY_TIMEOUT = 60 * 60 * 1000; // 1hr of inactivity
+const INACTIVITY_TIMEOUT = 15 * 60 * 60 * 1000; // 1hr of inactivity
 
 // DOM Elements
 const loginScreen = document.getElementById('loginScreen');
