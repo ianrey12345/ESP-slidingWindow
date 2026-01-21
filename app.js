@@ -15,6 +15,7 @@ const database = firebase.database();
 const auth = firebase.auth();
 
 // Global variables
+let onlineUsersCount = 0;
 let isConnected = false;
 let currentUser = null;
 let realtimeListeners = {};
@@ -49,6 +50,7 @@ function resetInactivityTimer() {
     if (currentUser) {
         inactivityTimer = setTimeout(() => {
             showNotification('Session timed out due to inactivity', 'warning', 5000);
+            removeUserPresence();
             auth.signOut().then(() => {
                 currentUser = null;
                 removeRealtimeListeners();
@@ -65,6 +67,8 @@ function stopInactivityTimer() {
     }
 }
 
+
+
 // Track user activity
 function setupActivityTracking() {
     const activityEvents = ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart', 'click'];
@@ -76,6 +80,91 @@ function setupActivityTracking() {
             }
         }, true);
     });
+}
+
+function setupUserPresence() {
+    if (!currentUser) return;
+    
+    // Reference to the user's presence in the database
+    const userPresenceRef = database.ref(`/onlineUsers/${currentUser.uid}`);
+    const connectedRef = database.ref('.info/connected');
+    
+    // Monitor connection status
+    connectedRef.on('value', (snapshot) => {
+        if (snapshot.val() === true) {
+            // User is connected
+            const userInfo = {
+                email: currentUser.email,
+                loginTime: firebase.database.ServerValue.TIMESTAMP,
+                lastActive: firebase.database.ServerValue.TIMESTAMP
+            };
+            
+            // Set user as online
+            userPresenceRef.set(userInfo);
+            
+            // Remove user when they disconnect
+            userPresenceRef.onDisconnect().remove();
+            
+            console.log('User presence set');
+        }
+    });
+    
+    // Update last active time every 30 seconds
+    const activeInterval = setInterval(() => {
+        if (currentUser) {
+            userPresenceRef.update({
+                lastActive: firebase.database.ServerValue.TIMESTAMP
+            });
+        } else {
+            clearInterval(activeInterval);
+        }
+    }, 30000); // 30 seconds
+}
+
+function monitorOnlineUsers() {
+    const onlineUsersRef = database.ref('/onlineUsers');
+    
+    onlineUsersRef.on('value', (snapshot) => {
+        const users = snapshot.val();
+        onlineUsersCount = users ? Object.keys(users).length : 0;
+        
+        console.log('Online users:', onlineUsersCount);
+        updateOnlineUsersDisplay();
+        
+        // Log user details (optional - for debugging)
+        if (users) {
+            console.log('User details:', Object.values(users).map(u => u.email));
+        }
+    });
+}
+
+function updateOnlineUsersDisplay() {
+    const userCountElement = document.getElementById('onlineUsersCount');
+    if (userCountElement) {
+        userCountElement.textContent = onlineUsersCount;
+        
+        // Change color based on count
+        if (onlineUsersCount === 0) {
+            userCountElement.style.color = '#999';
+        } else if (onlineUsersCount === 1) {
+            userCountElement.style.color = '#667eea';
+        } else {
+            userCountElement.style.color = '#48bb78';
+        }
+    }
+}
+
+function removeUserPresence() {
+    if (currentUser) {
+        const userPresenceRef = database.ref(`/onlineUsers/${currentUser.uid}`);
+        userPresenceRef.remove()
+            .then(() => {
+                console.log('User presence removed');
+            })
+            .catch((error) => {
+                console.error('Error removing presence:', error);
+            });
+    }
 }
 
 // Connection Status Management
@@ -612,6 +701,9 @@ document.getElementById('loginBtn').addEventListener('click', () => {
             showNotification('Login successful!', 'success');
             showDashboard();
             
+            setupUserPresence();
+            monitorOnlineUsers();
+            
             // Wait a moment for connection to stabilize, then load data
             setTimeout(() => {
                 initializeFirebaseDatabase();
@@ -628,6 +720,7 @@ document.getElementById('loginBtn').addEventListener('click', () => {
 });
 
 document.getElementById('logoutBtn').addEventListener('click', () => {
+    removeUserPresence();
     auth.signOut().then(() => {
         currentUser = null;
         stopInactivityTimer();
@@ -749,6 +842,9 @@ window.addEventListener('load', () => {
             console.log('User authenticated:', user.email);
             currentUser = user;
             showDashboard();
+
+            setupUserPresence();
+            monitorOnlineUsers();
             
             // Wait for connection before loading data
             setTimeout(() => {
