@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Smart Window Shading Control</title>
+    <link rel="stylesheet" href="styles.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/9.23.0/firebase-app-compat.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/9.23.0/firebase-database-compat.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/9.23.0/firebase-auth-compat.min.js"></script>
+</head>
+<body>
+    <!-- Connection Status Indicator -->
+    <div id="connectionStatus" class="connection-status connecting">
+        <span class="realtime-indicator inactive" id="realtimeIndicator"></span>
+        <span id="connectionText">Connecting...</span>
+    </div>
+
+    <!-- Add this anywhere in your dashboard, for example near the connection status -->
+    <div style="display: flex; align-items: center; gap: 40px; padding: 40px; background: transparent; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+        <span style="font-weight: 600;">👥 Online Users:</span>
+        <span id="onlineUsersCount" style="font-size: 1.2rem; font-weight: bold; color: #667eea;">0</span>
+    </div>
+
+    <!-- Notification Area -->
+    <div id="notification" class="notification"></div>
+
+    <!-- Login Screen -->
+    <div id="loginScreen" class="login-container">
+        <div class="login-form">
+            <h2> Smart Window Control</h2>
+            <div class="form-group">
+                <label for="email">Email Address</label>
+                <input type="email" id="email" placeholder="Enter your email" required />
+            </div>
+            <div class="form-group">
+                <label for="password">Password</label>
+                <input type="password" id="password" placeholder="Enter your password" required />
+            </div>
+            <button id="loginBtn" class="login-btn">Sign In</button>
+        </div>
+    </div>
+
+    <!-- Main Dashboard -->
+    <div id="dashboard" class="hidden">
+        <button id="logoutBtn" class="logout-btn">Logout</button>
+        
+        <div class="container">
+            <div class="header">
+                <h1> Smart Window Controller</h1>
+                <h1> (DFS Corp.)</h1>
+                <p>
+                    <span class="realtime-indicator active" id="dashboardIndicator"></span>
+                    Real time  thermal control and monitoring
+                </p>
+            </div>
+
+            <!-- Status Cards -->
+            <div class="status-grid">
+                <div class="status-card">
+                    <h3>Window Position</h3>
+                    <div class="status-value" id="windowPosition">50%</div>
+                </div>
+                <div class="status-card indoor-temp">
+                    <h3>Indoor Temp</h3>
+                    <div class="status-value" id="temperatureIndoor">--°C</div>
+                    <div class="sensor-status" id="indoorSensorStatus">Checking...</div>
+                </div>
+                <div class="status-card outdoor-temp">
+                    <h3>Outdoor Temp</h3>
+                    <div class="status-value" id="temperatureOutdoor">--°C</div>
+                    <div class="sensor-status" id="outdoorSensorStatus">Checking...</div>
+                </div>
+                <div class="status-card">
+                    <h3>Motor Status</h3>
+                    <div class="status-value" id="motorStatus">Idle</div>
+                </div>
+                <div class="status-card light">
+                    <h3> Light Level</h3>
+                    <div class="status-value" id="lightLevel">--</div>
+                    <div class="sensor-status" id="lightCondition">--</div>
+                </div>
+            </div>
+
+            <!-- Control Buttons -->
+            <div class="controls-grid">
+                <button id="openBtn" class="control-button open">
+                     OPEN WINDOW
+                </button>
+                <button id="closeBtn" class="control-button close">
+                     CLOSE WINDOW
+                </button>
+            </div>
+
+           <!-- Manual and Servo Controls Side by Side -->
+<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+    <!-- Manual Control -->
+    <div class="manual-control">
+        <h3>Manual Control for blinds</h3>
+        <div class="slider-container">
+            <div class="slider-info">
+                <span>Position:</span>
+                <span class="position-display" id="sliderValue">50%</span>
+            </div>
+            <input type="range" min="0" max="100" value="50" class="slider" id="positionSlider">
+            <div style="display: flex; justify-content: space-between; font-size: 0.9rem; color: #000000; margin-top: 10px;">
+                <span>Fully Open (0%)</span>
+                <span>Fully Closed (100%)</span>
+            </div>
+        </div>
+        <button id="applyBtn" class="control-button">Apply Position</button>
+    </div>
+
+   <!-- Stepper Motor Control for Tilting -->
+<div class="manual-control">
+    <h3>Blinds Tilt Angle</h3>
+    <div class="slider-container">
+        <div class="slider-info">
+            <span>Tilt Position:</span>
+            <span class="position-display" id="tiltPercentValue">50%</span>
+        </div>
+        <input type="range" min="0" max="100" value="50" class="slider" id="tiltSlider">
+        <div style="display: flex; justify-content: space-between; font-size: 0.9rem; color: #000000; margin-top: 10px;">
+            <span>Fully Open (0%)</span>
+            <span>Fully Closed (100%)</span>
+        </div>
+    </div>
+    <button id="applyTiltBtn" class="control-button">Apply Tilt Position</button>
+</div>
+
+            <!-- Activity Log -->
+            <div class="manual-control">
+                <h3>Activity Log</h3>
+                <div id="activityLog" style="max-height: 200px; overflow-y: auto; background: rgba(102, 126, 234, 0.05); padding: 15px; border-radius: 10px;">
+                    <div style="color: #999; text-align: center;">No recent activity</div>
+                </div>
+            </div>
+            
+            <!-- Auto Control Section and Temperature Thresholds Side by Side -->
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                <!-- Auto Control Section -->
+                <div class="manual-control">
+                    <h3>Automatic Control Settings</h3>
+                    <div style="display: grid; gap: 15px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; padding: 15px; background: rgba(102, 126, 234, 0.05); border-radius: 10px;">
+                            <span style="font-weight: 500;">Temperature-Based Control</span>
+                            <label class="switch">
+                                <input type="checkbox" id="autoTempToggle">
+                                <span class="switch-slider"></span>
+                            </label>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; align-items: center; padding: 15px; background: rgba(102, 126, 234, 0.05); border-radius: 10px;">
+                            <span style="font-weight: 500;">Light-Based Control</span>
+                            <label class="switch">
+                                <input type="checkbox" id="autoLightToggle">
+                                <span class="switch-slider"></span>
+                            </label>
+                        </div>
+                        <div id="controlModeDisplay" style="text-align: center; padding: 10px; background: #000000; color: white; border-radius: 10px; font-weight: bold;">
+                            Mode: Manual
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Temperature Thresholds -->
+                <div class="manual-control">
+                    <h3>Temperature Thresholds</h3>
+                    <div style="display: grid; gap: 15px;">
+                        <div>
+                            <label style="display: block; margin-bottom: 8px; font-weight: 500;">Close Window Above:</label>
+                            <input type="number" id="tempCloseThreshold" step="0.5" value="29.5" 
+                                style="width: 100%; padding: 10px; border: 2px solid #e2e8f0; border-radius: 8px;">
+                            <span style="font-size: 0.85rem; color: #666;">°C</span>
+                        </div>
+                        <div>
+                            <label style="display: block; margin-bottom: 8px; font-weight: 500;">Open Window Below:</label>
+                            <input type="number" id="tempOpenThreshold" step="0.5" value="29.0" 
+                                style="width: 100%; padding: 10px; border: 2px solid #e2e8f0; border-radius: 8px;">
+                            <span style="font-size: 0.85rem; color: #666;">°C</span>
+                        </div>
+                        <button id="applyThresholdsBtn" class="control-button">Apply Thresholds</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
+
+    <script src="app.js"></script>
+</body>
+</html>
