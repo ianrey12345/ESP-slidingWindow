@@ -201,7 +201,7 @@ connectedRef.on('value', (snapshot) => {
     updateConnectionStatus(snapshot.val() === true);
 });
 
-// Load Initial Data - NEW FUNCTION
+// Load Initial Data
 function loadInitialData() {
     console.log('Loading initial data from Firebase...');
     
@@ -221,6 +221,7 @@ function loadInitialData() {
                 if (data.lightCondition) updateLightCondition(data.lightCondition);
                 if (data.dhtIndoorAvailable !== undefined) updateSensorStatus('indoor', data.dhtIndoorAvailable);
                 if (data.dhtOutdoorAvailable !== undefined) updateSensorStatus('outdoor', data.dhtOutdoorAvailable);
+                if (data.stepperPosition !== undefined) updateStepperPosition(data.stepperPosition);
                 if (data.tempCloseThreshold !== undefined) {
                     const input = document.getElementById('tempCloseThreshold');
                     if (input) input.value = data.tempCloseThreshold;
@@ -241,9 +242,7 @@ function loadInitialData() {
                     const display = document.getElementById('controlModeDisplay');
                     if (display) display.textContent = `Mode: ${data.controlMode.replace('_', ' ').toUpperCase()}`;
                 }
-
-                if (data.stepperPosition !== undefined) updateStepperPosition(data.stepperPosition);
-               
+                
                 console.log('Initial data loaded successfully');
                 showNotification('Data loaded successfully', 'success', 2000);
             } else {
@@ -277,8 +276,8 @@ function initializeFirebaseDatabase() {
         lightCondition: "moderate",
         dhtIndoorAvailable: false,
         dhtOutdoorAvailable: false,
-        stepperPosition: 50,              
-        targetStepperPosition: 50,        
+        stepperPosition: 50,
+        targetStepperPosition: 50,
         targetStepperSteps: 750,
         lastUpdate: firebase.database.ServerValue.TIMESTAMP
     };
@@ -348,7 +347,7 @@ function updateActivityLogDisplay() {
     }).join('');
 }
 
-// Real-time Data Listeners - IMPROVED ERROR HANDLING
+// Real-time Data Listeners
 function setupRealtimeListeners() {
     if (!isConnected) {
         console.log('Cannot setup listeners - not connected');
@@ -356,17 +355,6 @@ function setupRealtimeListeners() {
     }
 
     console.log('Setting up real-time listeners...');
-
-    // Stepper Position Listener
-    realtimeListeners.stepper = database.ref('/stepperPosition').on('value', (snapshot) => {
-        const position = snapshot.val();
-        console.log('Stepper position update:', position);
-        if (position !== null) {
-            updateStepperPosition(position);
-        }
-    }, (error) => {
-        console.error('Stepper listener error:', error);
-    });
 
     // Window Position Listener
     realtimeListeners.position = database.ref('/windowPosition').on('value', (snapshot) => {
@@ -409,6 +397,17 @@ function setupRealtimeListeners() {
         console.log('Temp open threshold:', value);
         const input = document.getElementById('tempOpenThreshold');
         if (input && value !== null) input.value = value;
+    });
+
+    // Stepper Position Listener
+    realtimeListeners.stepper = database.ref('/stepperPosition').on('value', (snapshot) => {
+        const position = snapshot.val();
+        console.log('Stepper position update:', position);
+        if (position !== null) {
+            updateStepperPosition(position);
+        }
+    }, (error) => {
+        console.error('Stepper listener error:', error);
     });
 
     // Indoor Temperature Listener
@@ -508,10 +507,10 @@ function removeRealtimeListeners() {
         lightCondition: '/lightCondition',
         tempClose: '/tempCloseThreshold',
         tempOpen: '/tempOpenThreshold',
+        stepper: '/stepperPosition',
         autoTemp: '/autoTempControl',
         autoLight: '/autoLightControl',
-        controlMode: '/controlMode',
-        stepper: '/stepperPosition'
+        controlMode: '/controlMode'
     };
 
     Object.keys(realtimeListeners).forEach(key => {
@@ -523,7 +522,7 @@ function removeRealtimeListeners() {
     console.log('Listeners removed');
 }
 
-// Update Functions - IMPROVED NULL CHECKS
+// Update Functions
 function updateWindowPosition(position) {
     const positionElement = document.getElementById('windowPosition');
     const slider = document.getElementById('positionSlider');
@@ -603,6 +602,15 @@ function updateLightCondition(condition) {
     }
 }
 
+function updateSliderGradient(value) {
+    const slider = document.getElementById('positionSlider');
+    if (slider) {
+        const percentage = (value / 100) * 100;
+        slider.style.background = `linear-gradient(to right, #667eea 0%, #667eea ${percentage}%, #e2e8f0 ${percentage}%, #e2e8f0 100%)`;
+    }
+}
+
+// Stepper Motor Update Functions
 function updateStepperPosition(position) {
     const stepperElement = document.getElementById('stepperAngleValue');
     const slider = document.getElementById('stepperSlider');
@@ -613,14 +621,13 @@ function updateStepperPosition(position) {
     updateStepperSliderGradient(position);
 }
 
-function updateSliderGradient(value) {
-    const slider = document.getElementById('positionSlider');
+function updateStepperSliderGradient(value) {
+    const slider = document.getElementById('stepperSlider');
     if (slider) {
-        const percentage = (value / 100) * 100;
+        const percentage = value; // Already 0-100
         slider.style.background = `linear-gradient(to right, #667eea 0%, #667eea ${percentage}%, #e2e8f0 ${percentage}%, #e2e8f0 100%)`;
     }
 }
-
 
 // Command Functions
 function sendCommand(command) {
@@ -646,7 +653,6 @@ function sendManualCommand(position) {
         showNotification('No connection to Firebase', 'error');
         return;
     }
-    const steps = Math.round((percentage / 100) * 1500);
 
     Promise.all([
         database.ref('/windowCommand').set('manual'),
@@ -661,6 +667,28 @@ function sendManualCommand(position) {
     });
 }
 
+// Stepper Motor Command Function
+function sendStepperCommand(percentage) {
+    if (!isConnected) {
+        showNotification('No connection to Firebase', 'error');
+        return;
+    }
+
+    // Convert percentage (0-100) to steps (0-1500)
+    const steps = Math.round((percentage / 100) * 1500);
+
+    Promise.all([
+        database.ref('/targetStepperPosition').set(percentage),
+        database.ref('/targetStepperSteps').set(steps)
+    ]).then(() => {
+        showNotification(`Blinds tilting to: ${percentage}% (${steps} steps)`, 'success');
+        addActivityLog(`Tilt position set: ${percentage}% (${steps} steps)`, 'success');
+    }).catch((error) => {
+        console.error('Stepper command error:', error);
+        showNotification('Failed to send tilt command: ' + error.message, 'error');
+        addActivityLog(`Tilt failed: ${error.message}`, 'error');
+    });
+}
 
 // Authentication
 document.getElementById('loginBtn').addEventListener('click', () => {
@@ -746,6 +774,13 @@ function setupControlListeners() {
         sendManualCommand(targetPosition);
     });
 
+    // Slider Updates
+    document.getElementById('positionSlider').addEventListener('input', (e) => {
+        const value = e.target.value;
+        document.getElementById('sliderValue').textContent = value + '%';
+        updateSliderGradient(value);
+    });
+
     // Stepper Motor Control
     document.getElementById('applyStepperBtn').addEventListener('click', () => {
         const targetPosition = parseInt(document.getElementById('stepperSlider').value);
@@ -756,13 +791,6 @@ function setupControlListeners() {
         const value = e.target.value;
         document.getElementById('stepperAngleValue').textContent = value + '%';
         updateStepperSliderGradient(value);
-    });
-
-    // Slider Updates
-    document.getElementById('positionSlider').addEventListener('input', (e) => {
-        const value = e.target.value;
-        document.getElementById('sliderValue').textContent = value + '%';
-        updateSliderGradient(value);
     });
 
     // Temperature Thresholds
@@ -809,7 +837,6 @@ function setupControlListeners() {
         }
     });
 }
-
 
 // Initialize on page load
 window.addEventListener('load', () => {
