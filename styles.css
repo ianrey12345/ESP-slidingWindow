@@ -198,13 +198,22 @@ body {
     justify-content: center;
     gap: 10px;
 }
-
-.servo-angle-display {
+/* Stepper Motor Control Styles */
+.stepper-position-display {
     text-align: center;
-    font-size: 3rem;
+    font-size: 2.5rem;
     font-weight: bold;
-    color: #ffffff;
+    color: #000000;
     margin: 10px 0;
+    background: linear-gradient(135deg, #667eea, #764ba2);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+.manual-control.stepper {
+    background: linear-gradient(135deg, #f8f9ff, #e8ecff);
+    border: 2px solid rgba(102, 126, 234, 0.2);
 }
 
 .control-button:hover {
@@ -570,9 +579,8 @@ body {
         margin-top: 8px !important;
     }
 
-    /* Servo angle display */
-    .servo-angle-display {
-        font-size: 2rem;
+      .stepper-position-display {
+        font-size: 1.8rem;
     }
 
     /* Auto control and threshold sections - stack */
@@ -816,3 +824,4 @@ body {
         width: 100%;
     }
 }
+
