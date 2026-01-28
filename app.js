@@ -221,7 +221,6 @@ function loadInitialData() {
                 if (data.lightCondition) updateLightCondition(data.lightCondition);
                 if (data.dhtIndoorAvailable !== undefined) updateSensorStatus('indoor', data.dhtIndoorAvailable);
                 if (data.dhtOutdoorAvailable !== undefined) updateSensorStatus('outdoor', data.dhtOutdoorAvailable);
-                if (data.servoAngle !== undefined) updateServoAngle(data.servoAngle);
                 if (data.tempCloseThreshold !== undefined) {
                     const input = document.getElementById('tempCloseThreshold');
                     if (input) input.value = data.tempCloseThreshold;
@@ -242,7 +241,9 @@ function loadInitialData() {
                     const display = document.getElementById('controlModeDisplay');
                     if (display) display.textContent = `Mode: ${data.controlMode.replace('_', ' ').toUpperCase()}`;
                 }
-                
+
+                if (data.stepperPosition !== undefined) updateStepperPosition(data.stepperPosition);
+               
                 console.log('Initial data loaded successfully');
                 showNotification('Data loaded successfully', 'success', 2000);
             } else {
@@ -276,6 +277,9 @@ function initializeFirebaseDatabase() {
         lightCondition: "moderate",
         dhtIndoorAvailable: false,
         dhtOutdoorAvailable: false,
+        stepperPosition: 50,              
+        targetStepperPosition: 50,        
+        targetStepperSteps: 750,
         lastUpdate: firebase.database.ServerValue.TIMESTAMP
     };
 
@@ -353,6 +357,17 @@ function setupRealtimeListeners() {
 
     console.log('Setting up real-time listeners...');
 
+    // Stepper Position Listener
+    realtimeListeners.stepper = database.ref('/stepperPosition').on('value', (snapshot) => {
+        const position = snapshot.val();
+        console.log('Stepper position update:', position);
+        if (position !== null) {
+            updateStepperPosition(position);
+        }
+    }, (error) => {
+        console.error('Stepper listener error:', error);
+    });
+
     // Window Position Listener
     realtimeListeners.position = database.ref('/windowPosition').on('value', (snapshot) => {
         const position = snapshot.val();
@@ -394,15 +409,6 @@ function setupRealtimeListeners() {
         console.log('Temp open threshold:', value);
         const input = document.getElementById('tempOpenThreshold');
         if (input && value !== null) input.value = value;
-    });
-
-    // Servo Angle Listener
-    realtimeListeners.servo = database.ref('/servoAngle').on('value', (snapshot) => {
-        const angle = snapshot.val();
-        console.log('Servo angle update:', angle);
-        if (angle !== null) {
-            updateServoAngle(angle);
-        }
     });
 
     // Indoor Temperature Listener
@@ -502,10 +508,10 @@ function removeRealtimeListeners() {
         lightCondition: '/lightCondition',
         tempClose: '/tempCloseThreshold',
         tempOpen: '/tempOpenThreshold',
-        servo: '/servoAngle',
         autoTemp: '/autoTempControl',
         autoLight: '/autoLightControl',
-        controlMode: '/controlMode'
+        controlMode: '/controlMode',
+        stepper: '/stepperPosition'
     };
 
     Object.keys(realtimeListeners).forEach(key => {
@@ -597,6 +603,16 @@ function updateLightCondition(condition) {
     }
 }
 
+function updateStepperPosition(position) {
+    const stepperElement = document.getElementById('stepperAngleValue');
+    const slider = document.getElementById('stepperSlider');
+    
+    if (stepperElement) stepperElement.textContent = position + '%';
+    if (slider) slider.value = position;
+    
+    updateStepperSliderGradient(position);
+}
+
 function updateSliderGradient(value) {
     const slider = document.getElementById('positionSlider');
     if (slider) {
@@ -605,23 +621,6 @@ function updateSliderGradient(value) {
     }
 }
 
-function updateServoAngle(angle) {
-    const servoElement = document.getElementById('servoAngleValue');
-    const slider = document.getElementById('servoSlider');
-    
-    if (servoElement) servoElement.textContent = angle + '°';
-    if (slider) slider.value = angle;
-    
-    updateServoSliderGradient(angle);
-}
-
-function updateServoSliderGradient(value) {
-    const slider = document.getElementById('servoSlider');
-    if (slider) {
-        const percentage = (value / 720) * 100;
-        slider.style.background = `linear-gradient(to right, #667eea 0%, #667eea ${percentage}%, #e2e8f0 ${percentage}%, #e2e8f0 100%)`;
-    }
-}
 
 // Command Functions
 function sendCommand(command) {
@@ -647,6 +646,7 @@ function sendManualCommand(position) {
         showNotification('No connection to Firebase', 'error');
         return;
     }
+    const steps = Math.round((percentage / 100) * 1500);
 
     Promise.all([
         database.ref('/windowCommand').set('manual'),
@@ -661,23 +661,6 @@ function sendManualCommand(position) {
     });
 }
 
-function sendServoCommand(angle) {
-    if (!isConnected) {
-        showNotification('No connection to Firebase', 'error');
-        return;
-    }
-
-    database.ref('/targetServoAngle').set(angle)
-        .then(() => {
-            showNotification(`Servo moving to: ${angle}°`, 'success');
-            addActivityLog(`Servo angle set: ${angle}°`, 'success');
-        })
-        .catch((error) => {
-            console.error('Servo command error:', error);
-            showNotification('Failed to send servo command: ' + error.message, 'error');
-            addActivityLog(`Servo failed: ${error.message}`, 'error');
-        });
-}
 
 // Authentication
 document.getElementById('loginBtn').addEventListener('click', () => {
@@ -763,23 +746,23 @@ function setupControlListeners() {
         sendManualCommand(targetPosition);
     });
 
+    // Stepper Motor Control
+    document.getElementById('applyStepperBtn').addEventListener('click', () => {
+        const targetPosition = parseInt(document.getElementById('stepperSlider').value);
+        sendStepperCommand(targetPosition);
+    });
+
+    document.getElementById('stepperSlider').addEventListener('input', (e) => {
+        const value = e.target.value;
+        document.getElementById('stepperAngleValue').textContent = value + '%';
+        updateStepperSliderGradient(value);
+    });
+
     // Slider Updates
     document.getElementById('positionSlider').addEventListener('input', (e) => {
         const value = e.target.value;
         document.getElementById('sliderValue').textContent = value + '%';
         updateSliderGradient(value);
-    });
-
-    // Servo Control
-    document.getElementById('applyServoBtn').addEventListener('click', () => {
-        const targetAngle = parseInt(document.getElementById('servoSlider').value);
-        sendServoCommand(targetAngle);
-    });
-
-    document.getElementById('servoSlider').addEventListener('input', (e) => {
-        const value = e.target.value;
-        document.getElementById('servoAngleValue').textContent = value + '°';
-        updateServoSliderGradient(value);
     });
 
     // Temperature Thresholds
@@ -826,6 +809,7 @@ function setupControlListeners() {
         }
     });
 }
+
 
 // Initialize on page load
 window.addEventListener('load', () => {
