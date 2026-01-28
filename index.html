@@ -92,7 +92,7 @@
                 </button>
             </div>
 
-           <!-- Manual and Servo Controls Side by Side -->
+           <!-- Manual and Stepper Controls Side by Side -->
 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
     <!-- Manual Control -->
     <div class="manual-control">
@@ -111,24 +111,22 @@
         <button id="applyBtn" class="control-button">Apply Position</button>
     </div>
 
-    <!-- Servo Motor Control -->
+    <!-- Stepper Motor Control for Tilting -->
     <div class="manual-control">
-        <h3>Blinds Angle</h3>
+        <h3>Blinds Tilt Angle </h3>
         <div class="slider-container">
             <div class="slider-info">
-                <span>Servo Angle:</span>
-                <span class="position-display" id="servoAngleValue">360°</span>
+                <span>Tilt Position:</span>
+                <span class="position-display" id="stepperAngleValue">50%</span>
             </div>
-            <input type="range" min="0" max="720" value="360" class="slider" id="servoSlider">
+            <input type="range" min="0" max="100" value="50" step="1" class="slider" id="stepperSlider">
             <div style="display: flex; justify-content: space-between; font-size: 0.9rem; color: #000000; margin-top: 10px;">
-                <span>0°</span>
-                <span>180°</span>
-                <span>360°</span>
-                <span>540°</span>
-                <span>720°</span>
+                <span>0%</span>
+                <span>50%</span>
+                <span>100%</span>
             </div>
         </div>
-        <button id="applyServoBtn" class="control-button">Apply Position</button>
+        <button id="applyStepperBtn" class="control-button">Apply Tilt Angle</button>
     </div>
 </div>
 
@@ -188,10 +186,6 @@
             </div>
         </div>
     </div>
-
-    <script src="app.js"></script>
-</body>
-</html>
 
     <script src="app.js"></script>
 </body>
