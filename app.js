@@ -671,7 +671,7 @@ function sendTiltCommand(percent) {
     }
 
     // Calculate steps based on percentage (1500 steps = 100%)
-    const targetSteps = Math.round((percent / 100) * 1500);
+    const targetSteps = Math.round((percent / 100) * 30000);
 
     Promise.all([
         database.ref('/tiltPosition').set(percent),
@@ -873,3 +873,4 @@ window.addEventListener('load', () => {
         }
     });
 });
+
