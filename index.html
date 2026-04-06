@@ -8,6 +8,8 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/9.23.0/firebase-app-compat.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/9.23.0/firebase-database-compat.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/9.23.0/firebase-auth-compat.min.js"></script>
+    <!-- Chart.js for statistics graphs -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 </head>
 <body>
     <!-- Connection Status Indicator -->
@@ -15,16 +17,16 @@
         <span class="realtime-indicator inactive" id="realtimeIndicator"></span>
         <span id="connectionText">Connecting...</span>
     </div>
-
+ 
     <!-- Add this anywhere in your dashboard, for example near the connection status -->
     <div style="display: flex; align-items: center; gap: 40px; padding: 40px; background: transparent; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
         <span style="font-weight: 600;">👥 Online Users:</span>
         <span id="onlineUsersCount" style="font-size: 1.2rem; font-weight: bold; color: #667eea;">0</span>
     </div>
-
+ 
     <!-- Notification Area -->
     <div id="notification" class="notification"></div>
-
+ 
     <!-- Login Screen -->
     <div id="loginScreen" class="login-container">
         <div class="login-form">
@@ -40,7 +42,7 @@
             <button id="loginBtn" class="login-btn">Sign In</button>
         </div>
     </div>
-
+ 
     <!-- Main Dashboard -->
     <div id="dashboard" class="hidden">
         <button id="logoutBtn" class="logout-btn">Logout</button>
@@ -54,7 +56,7 @@
                     Real time  thermal control and monitoring
                 </p>
             </div>
-
+ 
             <!-- Status Cards -->
             <div class="status-grid">
                 <div class="status-card">
@@ -81,7 +83,113 @@
                     <div class="sensor-status" id="lightCondition">--</div>
                 </div>
             </div>
-
+ 
+            <!-- ===================== STATISTICS TOGGLE BUTTON ===================== -->
+            <div style="display: flex; justify-content: flex-start; margin-bottom: 18px;">
+                <button id="statsToggleBtn" style="
+                    display: flex; align-items: center; gap: 8px;
+                    padding: 9px 18px;
+                    background: linear-gradient(135deg, #667eea, #764ba2);
+                    color: white; border: none; border-radius: 10px;
+                    font-size: 0.9rem; font-weight: 600; cursor: pointer;
+                    box-shadow: 0 3px 10px rgba(102,126,234,0.35);
+                    transition: opacity 0.2s;">
+                    📊 Live Statistics
+                    <span id="statsToggleArrow" style="font-size:0.75rem; transition: transform 0.3s;">▲</span>
+                </button>
+            </div>
+            <!-- ===================== END STATISTICS TOGGLE BUTTON ===================== -->
+ 
+            <!-- ===================== FLOATING STATISTICS PANEL ===================== -->
+            <div id="statsFloatingPanel" style="
+                display: none;
+                position: fixed;
+                top: 80px;
+                left: 20px;
+                width: 420px;
+                max-width: calc(100vw - 40px);
+                background: rgba(255,255,255,0.97);
+                border-radius: 16px;
+                box-shadow: 0 8px 32px rgba(0,0,0,0.18);
+                border: 1px solid rgba(102,126,234,0.2);
+                z-index: 500;
+                overflow: hidden;
+                backdrop-filter: blur(12px);
+                transition: opacity 0.25s, transform 0.25s;
+                opacity: 0;
+                transform: translateY(-8px);
+            ">
+                <!-- Panel Header -->
+                <div style="
+                    display: flex; justify-content: space-between; align-items: center;
+                    padding: 14px 16px;
+                    background: linear-gradient(135deg, #667eea, #764ba2);
+                    color: white; cursor: move;" id="statsPanelHeader">
+                    <span style="font-weight: 700; font-size: 0.95rem;">📊 Live Statistics</span>
+                    <div style="display: flex; gap: 8px; align-items: center;">
+                        <select id="chartTimeWindow" style="padding: 4px 8px; border: none; border-radius: 6px; font-size: 0.8rem; cursor: pointer; background: rgba(255,255,255,0.2); color: white;">
+                            <option value="30">30 readings</option>
+                            <option value="60">60 readings</option>
+                            <option value="100">100 readings</option>
+                        </select>
+                        <button id="clearChartBtn" style="padding: 4px 10px; background: rgba(245,101,101,0.85); color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 0.8rem;">Clear</button>
+                        <button id="statsCloseBtn" style="padding: 4px 9px; background: rgba(255,255,255,0.2); color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 1rem; line-height: 1;">✕</button>
+                    </div>
+                </div>
+ 
+                <!-- Panel Body -->
+                <div style="padding: 14px; overflow-y: auto; max-height: calc(100vh - 160px);">
+ 
+                    <!-- Temperature Chart -->
+                    <div style="background: rgba(102,126,234,0.05); border-radius: 10px; padding: 12px; margin-bottom: 12px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                            <span style="font-weight: 600; font-size: 0.85rem;">🌡️ Temperature (°C)</span>
+                            <div style="display: flex; gap: 12px; font-size: 0.75rem;">
+                                <span><span style="display:inline-block;width:10px;height:10px;background:#667eea;border-radius:50%;margin-right:3px;"></span>Indoor</span>
+                                <span><span style="display:inline-block;width:10px;height:10px;background:#f6ad55;border-radius:50%;margin-right:3px;"></span>Outdoor</span>
+                            </div>
+                        </div>
+                        <div style="position: relative; height: 160px;">
+                            <canvas id="tempChart"></canvas>
+                        </div>
+                    </div>
+ 
+                    <!-- Light Level Chart -->
+                    <div style="background: rgba(236,201,75,0.07); border-radius: 10px; padding: 12px; margin-bottom: 12px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                            <span style="font-weight: 600; font-size: 0.85rem;">☀️ Light Level (%)</span>
+                            <div style="font-size: 0.75rem;">
+                                <span><span style="display:inline-block;width:10px;height:10px;background:#ecc94b;border-radius:50%;margin-right:3px;"></span>Light</span>
+                            </div>
+                        </div>
+                        <div style="position: relative; height: 130px;">
+                            <canvas id="lightChart"></canvas>
+                        </div>
+                    </div>
+ 
+                    <!-- Stats summary -->
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+                        <div style="background: rgba(102,126,234,0.08); border-radius: 8px; padding: 10px; text-align: center;">
+                            <div style="font-size: 0.7rem; color: #666; margin-bottom: 3px;">Indoor Min / Max</div>
+                            <div id="statIndoorMinMax" style="font-weight: 700; font-size: 0.85rem; color: #667eea;">-- / --°C</div>
+                        </div>
+                        <div style="background: rgba(246,173,85,0.12); border-radius: 8px; padding: 10px; text-align: center;">
+                            <div style="font-size: 0.7rem; color: #666; margin-bottom: 3px;">Outdoor Min / Max</div>
+                            <div id="statOutdoorMinMax" style="font-weight: 700; font-size: 0.85rem; color: #ed8936;">-- / --°C</div>
+                        </div>
+                        <div style="background: rgba(236,201,75,0.12); border-radius: 8px; padding: 10px; text-align: center;">
+                            <div style="font-size: 0.7rem; color: #666; margin-bottom: 3px;">Light Min / Max</div>
+                            <div id="statLightMinMax" style="font-weight: 700; font-size: 0.85rem; color: #d69e2e;">-- / --%</div>
+                        </div>
+                        <div style="background: rgba(72,187,120,0.1); border-radius: 8px; padding: 10px; text-align: center;">
+                            <div style="font-size: 0.7rem; color: #666; margin-bottom: 3px;">Readings Captured</div>
+                            <div id="statReadingsCount" style="font-weight: 700; font-size: 0.85rem; color: #48bb78;">0</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <!-- ===================== END FLOATING STATISTICS PANEL ===================== -->
+ 
             <!-- Control Buttons -->
             <div class="controls-grid">
                 <button id="openBtn" class="control-button open">
@@ -91,7 +199,7 @@
                      CLOSE WINDOW
                 </button>
             </div>
-
+ 
            <!-- Manual and Servo Controls Side by Side -->
 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
     <!-- Manual Control -->
@@ -110,7 +218,7 @@
         </div>
         <button id="applyBtn" class="control-button">Apply Position</button>
     </div>
-
+ 
    <!-- Stepper Motor Control for Tilting -->
 <div class="manual-control">
     <h3>Blinds Tilt Angle</h3>
@@ -127,7 +235,7 @@
     </div>
     <button id="applyTiltBtn" class="control-button">Apply Tilt Position</button>
 </div>
-
+ 
             <!-- Activity Log -->
             <div class="manual-control">
                 <h3>Activity Log</h3>
@@ -161,7 +269,7 @@
                         </div>
                     </div>
                 </div>
-
+ 
                 <!-- Temperature Thresholds -->
                 <div class="manual-control">
                     <h3>Temperature Thresholds</h3>
@@ -184,11 +292,7 @@
             </div>
         </div>
     </div>
-
-    <script src="app.js"></script>
-</body>
-</html>
-
+ 
     <script src="app.js"></script>
 </body>
 </html>
