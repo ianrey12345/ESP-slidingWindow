@@ -8,12 +8,12 @@ const firebaseConfig = {
     messagingSenderId: "745762327246",
     appId: "1:745762327246:web:5ef34612c7b060d57ade9f"
 };
-
+ 
 // Initialize Firebase
 firebase.initializeApp(firebaseConfig);
 const database = firebase.database();
 const auth = firebase.auth();
-
+ 
 // Global variables
 let onlineUsersCount = 0;
 let isConnected = false;
@@ -21,7 +21,7 @@ let currentUser = null;
 let realtimeListeners = {};
 let inactivityTimer = null;
 const INACTIVITY_TIMEOUT = 15 * 60 * 60 * 1000; // 1hr of inactivity
-
+ 
 // DOM Elements
 const loginScreen = document.getElementById('loginScreen');
 const dashboard = document.getElementById('dashboard');
@@ -29,18 +29,18 @@ const connectionStatus = document.getElementById('connectionStatus');
 const connectionText = document.getElementById('connectionText');
 const realtimeIndicator = document.getElementById('realtimeIndicator');
 const notification = document.getElementById('notification');
-
+ 
 // Notification System
 function showNotification(message, type = 'info', duration = 3000) {
     notification.textContent = message;
     notification.className = `notification ${type}`;
     notification.classList.add('show');
-
+ 
     setTimeout(() => {
         notification.classList.remove('show');
     }, duration);
 }
-
+ 
 // Inactivity Timer Management
 function resetInactivityTimer() {
     if (inactivityTimer) {
@@ -59,16 +59,16 @@ function resetInactivityTimer() {
         }, INACTIVITY_TIMEOUT);
     }
 }
-
+ 
 function stopInactivityTimer() {
     if (inactivityTimer) {
         clearTimeout(inactivityTimer);
         inactivityTimer = null;
     }
 }
-
-
-
+ 
+ 
+ 
 // Track user activity
 function setupActivityTracking() {
     const activityEvents = ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart', 'click'];
@@ -81,7 +81,7 @@ function setupActivityTracking() {
         }, true);
     });
 }
-
+ 
 function setupUserPresence() {
     if (!currentUser) return;
     
@@ -120,7 +120,7 @@ function setupUserPresence() {
         }
     }, 30000); // 30 seconds
 }
-
+ 
 function monitorOnlineUsers() {
     const onlineUsersRef = database.ref('/onlineUsers');
     
@@ -137,7 +137,7 @@ function monitorOnlineUsers() {
         }
     });
 }
-
+ 
 function updateOnlineUsersDisplay() {
     const userCountElement = document.getElementById('onlineUsersCount');
     if (userCountElement) {
@@ -153,7 +153,7 @@ function updateOnlineUsersDisplay() {
         }
     }
 }
-
+ 
 function removeUserPresence() {
     if (currentUser) {
         const userPresenceRef = database.ref(`/onlineUsers/${currentUser.uid}`);
@@ -166,7 +166,7 @@ function removeUserPresence() {
             });
     }
 }
-
+ 
 // Connection Status Management
 function updateConnectionStatus(connected) {
     isConnected = connected;
@@ -194,13 +194,13 @@ function updateConnectionStatus(connected) {
         showNotification('Connection lost. Attempting to reconnect...', 'warning');
     }
 }
-
+ 
 // Firebase Connection Monitoring
 const connectedRef = database.ref('.info/connected');
 connectedRef.on('value', (snapshot) => {
     updateConnectionStatus(snapshot.val() === true);
 });
-
+ 
 // Load Initial Data - NEW FUNCTION
 function loadInitialData() {
     console.log('Loading initial data from Firebase...');
@@ -255,7 +255,7 @@ function loadInitialData() {
             showNotification('Failed to load data: ' + error.message, 'error');
         });
 }
-
+ 
 // Initialize Firebase Database Structure
 function initializeFirebaseDatabase() {
     if (!isConnected) {
@@ -263,7 +263,7 @@ function initializeFirebaseDatabase() {
         showNotification('No internet connection. Please check your network.', 'error');
         return;
     }
-
+ 
     const initialData = {
         windowPosition: 50,
         motorStatus: "idle",
@@ -280,7 +280,7 @@ function initializeFirebaseDatabase() {
         targetTiltSteps: 750,  // 50% of 1500 steps
         lastUpdate: firebase.database.ServerValue.TIMESTAMP
     };
-
+ 
     // Set initial data only if values don't exist
     const promises = Object.keys(initialData).map(key => {
         return database.ref(`/${key}`).once('value').then(snapshot => {
@@ -290,7 +290,7 @@ function initializeFirebaseDatabase() {
             }
         });
     });
-
+ 
     Promise.all(promises)
         .then(() => {
             console.log('Firebase database structure initialized!');
@@ -303,10 +303,10 @@ function initializeFirebaseDatabase() {
             showNotification('Failed to initialize database: ' + error.message, 'error');
         });
 }
-
+ 
 // Activity Log Management
 let activityLog = [];
-
+ 
 function addActivityLog(message, type = 'info') {
     const timestamp = new Date().toLocaleTimeString();
     const logEntry = {
@@ -320,7 +320,7 @@ function addActivityLog(message, type = 'info') {
     
     updateActivityLogDisplay();
 }
-
+ 
 function updateActivityLogDisplay() {
     const logContainer = document.getElementById('activityLog');
     if (!logContainer) return;
@@ -345,16 +345,16 @@ function updateActivityLogDisplay() {
         `;
     }).join('');
 }
-
+ 
 // Real-time Data Listeners - IMPROVED ERROR HANDLING
 function setupRealtimeListeners() {
     if (!isConnected) {
         console.log('Cannot setup listeners - not connected');
         return;
     }
-
+ 
     console.log('Setting up real-time listeners...');
-
+ 
     // Window Position Listener
     realtimeListeners.position = database.ref('/windowPosition').on('value', (snapshot) => {
         const position = snapshot.val();
@@ -366,7 +366,7 @@ function setupRealtimeListeners() {
         console.error('Position listener error:', error);
         showNotification('Failed to get position updates', 'error');
     });
-
+ 
     // Motor Status Listener
     realtimeListeners.motor = database.ref('/motorStatus').on('value', (snapshot) => {
         const status = snapshot.val();
@@ -382,7 +382,7 @@ function setupRealtimeListeners() {
     }, (error) => {
         console.error('Motor status listener error:', error);
     });
-
+ 
     // Temperature Thresholds Listeners
     realtimeListeners.tempClose = database.ref('/tempCloseThreshold').on('value', (snapshot) => {
         const value = snapshot.val();
@@ -390,14 +390,14 @@ function setupRealtimeListeners() {
         const input = document.getElementById('tempCloseThreshold');
         if (input && value !== null) input.value = value;
     });
-
+ 
     realtimeListeners.tempOpen = database.ref('/tempOpenThreshold').on('value', (snapshot) => {
         const value = snapshot.val();
         console.log('Temp open threshold:', value);
         const input = document.getElementById('tempOpenThreshold');
         if (input && value !== null) input.value = value;
     });
-
+ 
     // Tilt Position Listener
     realtimeListeners.tilt = database.ref('/tiltPosition').on('value', (snapshot) => {
     const percent = snapshot.val();
@@ -406,8 +406,8 @@ function setupRealtimeListeners() {
         updateTiltPosition(percent);
     }
     });
-
-
+ 
+ 
     // Indoor Temperature Listener
     realtimeListeners.tempIndoor = database.ref('/temperatureIndoor').on('value', (snapshot) => {
         const temp = snapshot.val();
@@ -416,7 +416,7 @@ function setupRealtimeListeners() {
             updateTemperatureIndoor(temp);
         }
     });
-
+ 
     // Outdoor Temperature Listener
     realtimeListeners.tempOutdoor = database.ref('/temperatureOutdoor').on('value', (snapshot) => {
         const temp = snapshot.val();
@@ -425,7 +425,7 @@ function setupRealtimeListeners() {
             updateTemperatureOutdoor(temp);
         }
     });
-
+ 
     // Indoor Sensor Status Listener
     realtimeListeners.indoorAvail = database.ref('/dhtIndoorAvailable').on('value', (snapshot) => {
         const available = snapshot.val();
@@ -434,7 +434,7 @@ function setupRealtimeListeners() {
             updateSensorStatus('indoor', available);
         }
     });
-
+ 
     // Outdoor Sensor Status Listener
     realtimeListeners.outdoorAvail = database.ref('/dhtOutdoorAvailable').on('value', (snapshot) => {
         const available = snapshot.val();
@@ -443,7 +443,7 @@ function setupRealtimeListeners() {
             updateSensorStatus('outdoor', available);
         }
     });
-
+ 
     // Light Level Listener
     realtimeListeners.light = database.ref('/lightLevel').on('value', (snapshot) => {
         const lightLevel = snapshot.val();
@@ -452,7 +452,7 @@ function setupRealtimeListeners() {
             updateLightLevel(lightLevel);
         }
     });
-
+ 
     // Light Condition Listener
     realtimeListeners.lightCondition = database.ref('/lightCondition').on('value', (snapshot) => {
         const condition = snapshot.val();
@@ -461,7 +461,7 @@ function setupRealtimeListeners() {
             updateLightCondition(condition);
         }
     });
-
+ 
     // Auto Control Listeners
     realtimeListeners.autoTemp = database.ref('/autoTempControl').on('value', (snapshot) => {
         const enabled = snapshot.val();
@@ -469,14 +469,14 @@ function setupRealtimeListeners() {
         const toggle = document.getElementById('autoTempToggle');
         if (toggle && enabled !== null) toggle.checked = enabled;
     });
-
+ 
     realtimeListeners.autoLight = database.ref('/autoLightControl').on('value', (snapshot) => {
         const enabled = snapshot.val();
         console.log('Auto light control:', enabled);
         const toggle = document.getElementById('autoLightToggle');
         if (toggle && enabled !== null) toggle.checked = enabled;
     });
-
+ 
     realtimeListeners.controlMode = database.ref('/controlMode').on('value', (snapshot) => {
         const mode = snapshot.val();
         console.log('Control mode:', mode);
@@ -485,11 +485,11 @@ function setupRealtimeListeners() {
             display.textContent = `Mode: ${mode.replace('_', ' ').toUpperCase()}`;
         }
     });
-
+ 
     console.log('Real-time listeners setup complete');
     addActivityLog('Real-time listeners activated', 'success');
 }
-
+ 
 // Remove listeners when logging out
 function removeRealtimeListeners() {
     console.log('Removing real-time listeners...');
@@ -510,7 +510,7 @@ function removeRealtimeListeners() {
         autoLight: '/autoLightControl',
         controlMode: '/controlMode'
     };
-
+ 
     Object.keys(realtimeListeners).forEach(key => {
         if (realtimeListeners[key]) {
             database.ref(refPaths[key]).off('value', realtimeListeners[key]);
@@ -519,7 +519,7 @@ function removeRealtimeListeners() {
     realtimeListeners = {};
     console.log('Listeners removed');
 }
-
+ 
 // Update Functions - IMPROVED NULL CHECKS
 function updateWindowPosition(position) {
     const positionElement = document.getElementById('windowPosition');
@@ -532,7 +532,7 @@ function updateWindowPosition(position) {
     
     updateSliderGradient(position);
 }
-
+ 
 function updateMotorStatus(status) {
     const statusElement = document.getElementById('motorStatus');
     if (statusElement) {
@@ -550,7 +550,7 @@ function updateMotorStatus(status) {
         }
     });
 }
-
+ 
 function updateTemperatureIndoor(temp) {
     const tempElement = document.getElementById('temperatureIndoor');
     if (tempElement) {
@@ -561,7 +561,7 @@ function updateTemperatureIndoor(temp) {
         }
     }
 }
-
+ 
 function updateTemperatureOutdoor(temp) {
     const tempElement = document.getElementById('temperatureOutdoor');
     if (tempElement) {
@@ -572,7 +572,7 @@ function updateTemperatureOutdoor(temp) {
         }
     }
 }
-
+ 
 function updateSensorStatus(type, available) {
     const statusElement = document.getElementById(type + 'SensorStatus');
     if (statusElement) {
@@ -585,21 +585,21 @@ function updateSensorStatus(type, available) {
         }
     }
 }
-
+ 
 function updateLightLevel(lightValue) {
     const lightElement = document.getElementById('lightLevel');
     if (lightElement) {
         lightElement.textContent = lightValue + '%';
     }
 }
-
+ 
 function updateLightCondition(condition) {
     const conditionElement = document.getElementById('lightCondition');
     if (conditionElement) {
         conditionElement.textContent = condition.charAt(0).toUpperCase() + condition.slice(1);
     }
 }
-
+ 
 function updateSliderGradient(value) {
     const slider = document.getElementById('positionSlider');
     if (slider) {
@@ -607,7 +607,7 @@ function updateSliderGradient(value) {
         slider.style.background = `linear-gradient(to right, #667eea 0%, #667eea ${percentage}%, #e2e8f0 ${percentage}%, #e2e8f0 100%)`;
     }
 }
-
+ 
 function updateTiltPosition(percent) {
     const tiltElement = document.getElementById('tiltPercentValue');
     const slider = document.getElementById('tiltSlider');
@@ -617,7 +617,7 @@ function updateTiltPosition(percent) {
     
     updateTiltSliderGradient(percent);
 }
-
+ 
 function updateTiltSliderGradient(value) {
     const slider = document.getElementById('tiltSlider');
     if (slider) {
@@ -625,14 +625,14 @@ function updateTiltSliderGradient(value) {
         slider.style.background = `linear-gradient(to right, #667eea 0%, #667eea ${percentage}%, #e2e8f0 ${percentage}%, #e2e8f0 100%)`;
     }
 }
-
+ 
 // Command Functions
 function sendCommand(command) {
     if (!isConnected) {
         showNotification('No connection to Firebase', 'error');
         return;
     }
-
+ 
     database.ref('/windowCommand').set(command)
         .then(() => {
             showNotification(`Command sent: ${command.toUpperCase()}`, 'success');
@@ -644,13 +644,13 @@ function sendCommand(command) {
             addActivityLog(`Failed: ${error.message}`, 'error');
         });
 }
-
+ 
 function sendManualCommand(position) {
     if (!isConnected) {
         showNotification('No connection to Firebase', 'error');
         return;
     }
-
+ 
     Promise.all([
         database.ref('/windowCommand').set('manual'),
         database.ref('/targetPosition').set(position)
@@ -663,16 +663,16 @@ function sendManualCommand(position) {
         addActivityLog(`Failed: ${error.message}`, 'error');
     });
 }
-
+ 
 function sendTiltCommand(percent) {
     if (!isConnected) {
         showNotification('No connection to Firebase', 'error');
         return;
     }
-
+ 
     // Calculate steps based on percentage (1500 steps = 100%)
     const targetSteps = Math.round((percent / 100) * 2600);
-
+ 
     Promise.all([
         database.ref('/tiltPosition').set(percent),
         database.ref('/targetTiltSteps').set(targetSteps)
@@ -685,22 +685,22 @@ function sendTiltCommand(percent) {
         addActivityLog(`Tilt failed: ${error.message}`, 'error');
     });
 }
-
+ 
 // Authentication
 document.getElementById('loginBtn').addEventListener('click', () => {
     const email = document.getElementById('email').value.trim();
     const password = document.getElementById('password').value;
-
+ 
     if (!email || !password) {
         showNotification('Please enter email and password', 'error');
         return;
     }
-
+ 
     if (!isConnected) {
         showNotification('No internet connection', 'error');
         return;
     }
-
+ 
     auth.signInWithEmailAndPassword(email, password)
         .then((userCredential) => {
             currentUser = userCredential.user;
@@ -725,7 +725,7 @@ document.getElementById('loginBtn').addEventListener('click', () => {
             showNotification('Login failed: ' + error.message, 'error');
         });
 });
-
+ 
 document.getElementById('logoutBtn').addEventListener('click', () => {
     removeUserPresence();
     auth.signOut().then(() => {
@@ -740,55 +740,57 @@ document.getElementById('logoutBtn').addEventListener('click', () => {
         showNotification('Logout failed: ' + error.message, 'error');
     });
 });
-
+ 
 function showDashboard() {
     loginScreen.classList.add('hidden');
     dashboard.classList.remove('hidden');
     setupControlListeners();
+    // Small delay so canvas elements are fully visible before Chart.js measures them
+    setTimeout(() => initCharts(), 100);
 }
-
+ 
 function hideDashboard() {
     dashboard.classList.add('hidden');
     loginScreen.classList.remove('hidden');
     document.getElementById('email').value = '';
     document.getElementById('password').value = '';
 }
-
+ 
 // Control Functions
 function setupControlListeners() {
     // Window Control Buttons
     document.getElementById('openBtn').addEventListener('click', () => {
         sendCommand('open');
     });
-
+ 
     document.getElementById('closeBtn').addEventListener('click', () => {
         sendCommand('close');
     });
-
+ 
     document.getElementById('applyBtn').addEventListener('click', () => {
         const targetPosition = parseInt(document.getElementById('positionSlider').value);
         sendManualCommand(targetPosition);
     });
-
+ 
     // Slider Updates
     document.getElementById('positionSlider').addEventListener('input', (e) => {
         const value = e.target.value;
         document.getElementById('sliderValue').textContent = value + '%';
         updateSliderGradient(value);
     });
-
+ 
     // Tilt Control
     document.getElementById('applyTiltBtn').addEventListener('click', () => {
     const targetPercent = parseInt(document.getElementById('tiltSlider').value);
     sendTiltCommand(targetPercent);
     });
-
+ 
     document.getElementById('tiltSlider').addEventListener('input', (e) => {
     const value = e.target.value;
     document.getElementById('tiltPercentValue').textContent = value + '%';
     updateTiltSliderGradient(value);
     });
-
+ 
     // Temperature Thresholds
     document.getElementById('applyThresholdsBtn').addEventListener('click', () => {
         const closeThreshold = parseFloat(document.getElementById('tempCloseThreshold').value);
@@ -807,7 +809,7 @@ function setupControlListeners() {
             addActivityLog(`Thresholds: Close>${closeThreshold}°C, Open<${openThreshold}°C`, 'success');
         });
     });
-
+ 
     // Auto Control Toggles
     document.getElementById('autoTempToggle').addEventListener('change', (e) => {
         database.ref('/autoTempControl').set(e.target.checked);
@@ -820,7 +822,7 @@ function setupControlListeners() {
             addActivityLog('Auto temperature control disabled', 'info');
         }
     });
-
+ 
     document.getElementById('autoLightToggle').addEventListener('change', (e) => {
         database.ref('/autoLightControl').set(e.target.checked);
         if (e.target.checked) {
@@ -833,7 +835,317 @@ function setupControlListeners() {
         }
     });
 }
-
+ 
+// =====================================================================
+// STATISTICS CHART MODULE
+// =====================================================================
+ 
+// In-memory history buffers (session only)
+const chartHistory = {
+    labels: [],
+    indoorTemp: [],
+    outdoorTemp: [],
+    lightLevel: []
+};
+ 
+let tempChartInstance = null;
+let lightChartInstance = null;
+const MAX_CHART_POINTS = 30; // default, updated by selector
+ 
+function getMaxPoints() {
+    const sel = document.getElementById('chartTimeWindow');
+    return sel ? parseInt(sel.value) : 30;
+}
+ 
+function initCharts() {
+    const tempCtx = document.getElementById('tempChart');
+    const lightCtx = document.getElementById('lightChart');
+    if (!tempCtx || !lightCtx) return;
+ 
+    // ---- Toggle / Close panel ----
+    const panel       = document.getElementById('statsFloatingPanel');
+    const toggleBtn   = document.getElementById('statsToggleBtn');
+    const closeBtn    = document.getElementById('statsCloseBtn');
+    const arrow       = document.getElementById('statsToggleArrow');
+ 
+    function openPanel() {
+        panel.style.display = 'block';
+        requestAnimationFrame(() => {
+            panel.style.opacity = '1';
+            panel.style.transform = 'translateY(0)';
+        });
+        arrow.style.transform = 'rotate(180deg)';
+        setTimeout(() => {
+            if (tempChartInstance) tempChartInstance.resize();
+            if (lightChartInstance) lightChartInstance.resize();
+        }, 50);
+    }
+ 
+    function closePanel() {
+        panel.style.opacity = '0';
+        panel.style.transform = 'translateY(-8px)';
+        arrow.style.transform = 'rotate(0deg)';
+        setTimeout(() => { panel.style.display = 'none'; }, 250);
+    }
+ 
+    let panelOpen = false;
+    toggleBtn.addEventListener('click', () => {
+        panelOpen = !panelOpen;
+        panelOpen ? openPanel() : closePanel();
+    });
+    closeBtn.addEventListener('click', () => {
+        panelOpen = false;
+        closePanel();
+    });
+ 
+    // ---- Drag to reposition ----
+    const header = document.getElementById('statsPanelHeader');
+    let dragging = false, startX, startY, origLeft, origTop;
+ 
+    header.addEventListener('mousedown', (e) => {
+        if (e.target.tagName === 'BUTTON' || e.target.tagName === 'SELECT') return;
+        dragging = true;
+        startX = e.clientX; startY = e.clientY;
+        const rect = panel.getBoundingClientRect();
+        origLeft = rect.left; origTop = rect.top;
+        panel.style.transition = 'none';
+        document.body.style.userSelect = 'none';
+    });
+    document.addEventListener('mousemove', (e) => {
+        if (!dragging) return;
+        panel.style.left = Math.max(0, origLeft + e.clientX - startX) + 'px';
+        panel.style.top  = Math.max(0, origTop  + e.clientY - startY) + 'px';
+    });
+    document.addEventListener('mouseup', () => {
+        dragging = false;
+        panel.style.transition = 'opacity 0.25s, transform 0.25s';
+        document.body.style.userSelect = '';
+    });
+ 
+    // Touch drag for mobile
+    header.addEventListener('touchstart', (e) => {
+        if (e.target.tagName === 'BUTTON' || e.target.tagName === 'SELECT') return;
+        const t = e.touches[0];
+        dragging = true;
+        startX = t.clientX; startY = t.clientY;
+        const rect = panel.getBoundingClientRect();
+        origLeft = rect.left; origTop = rect.top;
+        panel.style.transition = 'none';
+    }, { passive: true });
+    document.addEventListener('touchmove', (e) => {
+        if (!dragging) return;
+        const t = e.touches[0];
+        panel.style.left = Math.max(0, origLeft + t.clientX - startX) + 'px';
+        panel.style.top  = Math.max(0, origTop  + t.clientY - startY) + 'px';
+    }, { passive: true });
+    document.addEventListener('touchend', () => {
+        dragging = false;
+        panel.style.transition = 'opacity 0.25s, transform 0.25s';
+    });
+ 
+    const commonOptions = {
+        responsive: true,
+        maintainAspectRatio: false,
+        animation: { duration: 400 },
+        plugins: {
+            legend: { display: false },
+            tooltip: {
+                mode: 'index',
+                intersect: false,
+                backgroundColor: 'rgba(0,0,0,0.75)',
+                titleFont: { size: 11 },
+                bodyFont: { size: 11 }
+            }
+        },
+        scales: {
+            x: {
+                ticks: { maxTicksLimit: 8, font: { size: 10 }, color: '#555' },
+                grid: { color: 'rgba(0,0,0,0.05)' }
+            },
+            y: {
+                ticks: { font: { size: 10 }, color: '#555' },
+                grid: { color: 'rgba(0,0,0,0.07)' }
+            }
+        },
+        elements: {
+            point: { radius: 2, hoverRadius: 5 },
+            line: { tension: 0.35, borderWidth: 2 }
+        }
+    };
+ 
+    // Temperature chart
+    tempChartInstance = new Chart(tempCtx, {
+        type: 'line',
+        data: {
+            labels: [],
+            datasets: [
+                {
+                    label: 'Indoor (°C)',
+                    data: [],
+                    borderColor: '#667eea',
+                    backgroundColor: 'rgba(102,126,234,0.12)',
+                    fill: true
+                },
+                {
+                    label: 'Outdoor (°C)',
+                    data: [],
+                    borderColor: '#f6ad55',
+                    backgroundColor: 'rgba(246,173,85,0.10)',
+                    fill: true
+                }
+            ]
+        },
+        options: {
+            ...commonOptions,
+            scales: {
+                ...commonOptions.scales,
+                y: {
+                    ...commonOptions.scales.y,
+                    title: { display: true, text: '°C', font: { size: 10 } }
+                }
+            }
+        }
+    });
+ 
+    // Light chart
+    lightChartInstance = new Chart(lightCtx, {
+        type: 'line',
+        data: {
+            labels: [],
+            datasets: [
+                {
+                    label: 'Light Level (%)',
+                    data: [],
+                    borderColor: '#ecc94b',
+                    backgroundColor: 'rgba(236,201,75,0.15)',
+                    fill: true
+                }
+            ]
+        },
+        options: {
+            ...commonOptions,
+            scales: {
+                ...commonOptions.scales,
+                y: {
+                    ...commonOptions.scales.y,
+                    min: 0,
+                    max: 100,
+                    title: { display: true, text: '%', font: { size: 10 } }
+                }
+            }
+        }
+    });
+ 
+    // Wire up controls
+    const sel = document.getElementById('chartTimeWindow');
+    if (sel) sel.addEventListener('change', refreshChartView);
+ 
+    const clearBtn = document.getElementById('clearChartBtn');
+    if (clearBtn) clearBtn.addEventListener('click', () => {
+        chartHistory.labels = [];
+        chartHistory.indoorTemp = [];
+        chartHistory.outdoorTemp = [];
+        chartHistory.lightLevel = [];
+        refreshChartView();
+        updateStatsSummary();
+    });
+}
+ 
+function pushChartPoint(indoorTemp, outdoorTemp, lightLevel) {
+    const now = new Date();
+    const label = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+ 
+    chartHistory.labels.push(label);
+    chartHistory.indoorTemp.push(indoorTemp > 0 ? parseFloat(indoorTemp.toFixed(1)) : null);
+    chartHistory.outdoorTemp.push(outdoorTemp > 0 ? parseFloat(outdoorTemp.toFixed(1)) : null);
+    chartHistory.lightLevel.push(lightLevel !== null ? parseFloat(lightLevel) : null);
+ 
+    // Keep a generous buffer; view is trimmed per selector
+    const BUFFER = 200;
+    if (chartHistory.labels.length > BUFFER) {
+        chartHistory.labels.shift();
+        chartHistory.indoorTemp.shift();
+        chartHistory.outdoorTemp.shift();
+        chartHistory.lightLevel.shift();
+    }
+ 
+    refreshChartView();
+    updateStatsSummary();
+}
+ 
+function refreshChartView() {
+    if (!tempChartInstance || !lightChartInstance) return;
+ 
+    const max = getMaxPoints();
+    const slice = (arr) => arr.slice(-max);
+ 
+    const labels = slice(chartHistory.labels);
+ 
+    tempChartInstance.data.labels = labels;
+    tempChartInstance.data.datasets[0].data = slice(chartHistory.indoorTemp);
+    tempChartInstance.data.datasets[1].data = slice(chartHistory.outdoorTemp);
+    tempChartInstance.update('none');
+ 
+    lightChartInstance.data.labels = labels;
+    lightChartInstance.data.datasets[0].data = slice(chartHistory.lightLevel);
+    lightChartInstance.update('none');
+}
+ 
+function updateStatsSummary() {
+    const validNums = (arr) => arr.filter(v => v !== null && !isNaN(v));
+ 
+    const setMinMax = (id, arr, unit) => {
+        const el = document.getElementById(id);
+        if (!el) return;
+        const nums = validNums(arr);
+        if (nums.length === 0) { el.textContent = `-- / --${unit}`; return; }
+        el.textContent = `${Math.min(...nums).toFixed(1)} / ${Math.max(...nums).toFixed(1)}${unit}`;
+    };
+ 
+    setMinMax('statIndoorMinMax', chartHistory.indoorTemp, '°C');
+    setMinMax('statOutdoorMinMax', chartHistory.outdoorTemp, '°C');
+    setMinMax('statLightMinMax', chartHistory.lightLevel, '%');
+ 
+    const countEl = document.getElementById('statReadingsCount');
+    if (countEl) countEl.textContent = chartHistory.labels.length;
+}
+ 
+// Sampler: push a point every time sensor data comes in (throttled to once every 5s)
+let lastChartPush = 0;
+let latestSensorState = { indoor: 0, outdoor: 0, light: 0 };
+ 
+function onSensorUpdate(type, value) {
+    latestSensorState[type] = value;
+    const now = Date.now();
+    if (now - lastChartPush >= 5000) {
+        lastChartPush = now;
+        pushChartPoint(latestSensorState.indoor, latestSensorState.outdoor, latestSensorState.light);
+    }
+}
+ 
+// Patch update functions to also feed charts
+const _origUpdateIndoor = updateTemperatureIndoor;
+function updateTemperatureIndoor(temp) {
+    _origUpdateIndoor(temp);
+    onSensorUpdate('indoor', temp);
+}
+ 
+const _origUpdateOutdoor = updateTemperatureOutdoor;
+function updateTemperatureOutdoor(temp) {
+    _origUpdateOutdoor(temp);
+    onSensorUpdate('outdoor', temp);
+}
+ 
+const _origUpdateLight = updateLightLevel;
+function updateLightLevel(lightValue) {
+    _origUpdateLight(lightValue);
+    onSensorUpdate('light', parseFloat(lightValue));
+}
+ 
+// =====================================================================
+// END STATISTICS CHART MODULE
+// =====================================================================
+ 
 // Initialize on page load
 window.addEventListener('load', () => {
     console.log('Application loading...');
@@ -849,7 +1161,7 @@ window.addEventListener('load', () => {
             console.log('User authenticated:', user.email);
             currentUser = user;
             showDashboard();
-
+ 
             setupUserPresence();
             monitorOnlineUsers();
             
@@ -873,9 +1185,3 @@ window.addEventListener('load', () => {
         }
     });
 });
-
-
-
-
-
-
