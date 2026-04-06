@@ -799,79 +799,327 @@ function setupControlListeners() {
 }
 
 // =====================================================================
-// STATISTICS CHART MODULE
+// STATISTICS CHART MODULE  — with Firebase daily history log
 // =====================================================================
 
-// In-memory history buffers (session only)
-const chartHistory = {
-    labels: [],
-    indoorTemp: [],
-    outdoorTemp: [],
-    lightLevel: []
-};
-
+// ---------- In-memory live buffer ----------
+const chartHistory = { labels: [], indoorTemp: [], outdoorTemp: [], lightLevel: [] };
 let tempChartInstance = null;
 let lightChartInstance = null;
-const MAX_CHART_POINTS = 30; // default, updated by selector
+let viewingHistorical = false;   // true when showing a past day
 
+// ---------- Firebase history save (every 30 s) ----------
+let lastFirebaseSave = 0;
+let latestSensorState = { indoor: null, outdoor: null, light: null };
+let lastChartPush = 0;
+
+const SAVE_INTERVAL_MS  = 30000;   // save to Firebase every 30 s
+const CHART_PUSH_MS     = 5000;    // update live chart every 5 s
+const HISTORY_MAX_DAYS  = 7;       // keep 7 days of history
+
+function todayKey() {
+    const d = new Date();
+    return d.getFullYear() + '-' +
+           String(d.getMonth()+1).padStart(2,'0') + '-' +
+           String(d.getDate()).padStart(2,'0');
+}
+
+function saveReadingToFirebase() {
+    if (!isConnected || !currentUser) return;
+    if (latestSensorState.indoor === null) return;
+
+    const now   = Date.now();
+    const key   = todayKey();
+    const entry = {
+        ts:      now,
+        indoor:  latestSensorState.indoor,
+        outdoor: latestSensorState.outdoor,
+        light:   latestSensorState.light
+    };
+
+    database.ref('/sensorHistory/' + key + '/' + now).set(entry)
+        .catch(err => console.warn('History save failed:', err.message));
+}
+
+function pruneOldHistory() {
+    if (!isConnected || !currentUser) return;
+    const cutoff = new Date();
+    cutoff.setDate(cutoff.getDate() - HISTORY_MAX_DAYS);
+
+    database.ref('/sensorHistory').once('value').then(snap => {
+        if (!snap.val()) return;
+        const removes = [];
+        snap.forEach(daySnap => {
+            const parts = daySnap.key.split('-').map(Number);
+            const dayDate = new Date(parts[0], parts[1]-1, parts[2]);
+            if (dayDate < cutoff) {
+                removes.push(database.ref('/sensorHistory/' + daySnap.key).remove());
+            }
+        });
+        if (removes.length) Promise.all(removes).then(() =>
+            console.log('Pruned', removes.length, 'old history day(s)'));
+    }).catch(err => console.warn('Prune check failed:', err.message));
+}
+
+// Called every time a sensor value changes
+function onSensorUpdate(type, value) {
+    if (!isNaN(value) && value !== null) latestSensorState[type] = value;
+    const now = Date.now();
+
+    // Live chart push (every 5 s)
+    if (!viewingHistorical && now - lastChartPush >= CHART_PUSH_MS) {
+        lastChartPush = now;
+        pushChartPoint(
+            latestSensorState.indoor,
+            latestSensorState.outdoor,
+            latestSensorState.light,
+            new Date()
+        );
+    }
+
+    // Firebase save (every 30 s)
+    if (now - lastFirebaseSave >= SAVE_INTERVAL_MS) {
+        lastFirebaseSave = now;
+        saveReadingToFirebase();
+    }
+}
+
+// ---------- Available days list ----------
+function loadAvailableDays(callback) {
+    database.ref('/sensorHistory').once('value').then(snap => {
+        const days = [];
+        if (snap.val()) snap.forEach(d => days.push(d.key));
+        days.sort((a,b) => b.localeCompare(a)); // newest first
+        callback(days);
+    }).catch(() => callback([]));
+}
+
+// ---------- Load a specific day from Firebase ----------
+function loadDayHistory(dateKey) {
+    const loadingEl = document.getElementById('historyLoading');
+    if (loadingEl) { loadingEl.style.display = 'block'; loadingEl.textContent = 'Loading ' + dateKey + '...'; }
+
+    database.ref('/sensorHistory/' + dateKey)
+        .orderByKey()
+        .once('value')
+        .then(snap => {
+            if (loadingEl) loadingEl.style.display = 'none';
+            if (!snap.val()) {
+                showNotification('No data found for ' + dateKey, 'warning');
+                return;
+            }
+
+            const labels = [], indoor = [], outdoor = [], light = [];
+            snap.forEach(entry => {
+                const e = entry.val();
+                const t = new Date(e.ts);
+                labels.push(t.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
+                indoor.push(e.indoor !== null && !isNaN(e.indoor) ? parseFloat(e.indoor.toFixed(1)) : null);
+                outdoor.push(e.outdoor !== null && !isNaN(e.outdoor) ? parseFloat(e.outdoor.toFixed(1)) : null);
+                light.push(e.light !== null && !isNaN(e.light) ? parseFloat(e.light) : null);
+            });
+
+            viewingHistorical = true;
+            renderChartsWithData(labels, indoor, outdoor, light);
+
+            // Update summary with historical data
+            updateStatsSummary(indoor, outdoor, light, labels.length);
+
+            // Show banner
+            const banner = document.getElementById('historyBanner');
+            if (banner) {
+                banner.style.display = 'block';
+                banner.textContent = '📅 Viewing history: ' + dateKey + '  (' + labels.length + ' readings)';
+            }
+        })
+        .catch(err => {
+            if (loadingEl) loadingEl.style.display = 'none';
+            showNotification('Failed to load history: ' + err.message, 'error');
+        });
+}
+
+function switchToLive() {
+    viewingHistorical = false;
+    const banner = document.getElementById('historyBanner');
+    if (banner) banner.style.display = 'none';
+    renderChartsWithData(
+        chartHistory.labels.slice(-getMaxPoints()),
+        chartHistory.indoorTemp.slice(-getMaxPoints()),
+        chartHistory.outdoorTemp.slice(-getMaxPoints()),
+        chartHistory.lightLevel.slice(-getMaxPoints())
+    );
+    updateStatsSummary(chartHistory.indoorTemp, chartHistory.outdoorTemp, chartHistory.lightLevel, chartHistory.labels.length);
+}
+
+// ---------- Day picker UI ----------
+function renderDayPicker(days) {
+    const container = document.getElementById('dayPickerContainer');
+    if (!container) return;
+    if (!days.length) {
+        container.innerHTML = '<span style="color:#aaa;font-size:0.8rem;">No history yet — data saves every 30 s</span>';
+        return;
+    }
+
+    container.innerHTML = days.map(day => {
+        const d = new Date(day + 'T00:00:00');
+        const today = new Date(); today.setHours(0,0,0,0);
+        const diff  = Math.round((today - d) / 86400000);
+        const label = diff === 0 ? 'Today' : diff === 1 ? 'Yesterday' : day;
+        return '<button class="day-pill" data-day="' + day + '" style="' +
+            'padding:5px 11px;margin:3px;border:none;border-radius:20px;cursor:pointer;font-size:0.78rem;font-weight:600;' +
+            'background:rgba(102,126,234,0.12);color:#667eea;transition:all 0.2s;">' +
+            label + '</button>';
+    }).join('');
+
+    container.querySelectorAll('.day-pill').forEach(btn => {
+        btn.addEventListener('mouseover', () => btn.style.background = '#667eea', false);
+        btn.addEventListener('mouseout',  () => {
+            btn.style.background = btn.classList.contains('active-day')
+                ? '#667eea' : 'rgba(102,126,234,0.12)';
+        }, false);
+        btn.addEventListener('click', () => {
+            container.querySelectorAll('.day-pill').forEach(b => {
+                b.classList.remove('active-day');
+                b.style.background = 'rgba(102,126,234,0.12)';
+                b.style.color = '#667eea';
+            });
+            btn.classList.add('active-day');
+            btn.style.background = '#667eea';
+            btn.style.color = 'white';
+            loadDayHistory(btn.dataset.day);
+        }, false);
+    });
+}
+
+// ---------- Chart helpers ----------
 function getMaxPoints() {
     const sel = document.getElementById('chartTimeWindow');
     return sel ? parseInt(sel.value) : 30;
 }
 
+function pushChartPoint(indoorTemp, outdoorTemp, lightLevel, dateObj) {
+    if (viewingHistorical) return;
+    const label = (dateObj || new Date()).toLocaleTimeString([], { hour:'2-digit', minute:'2-digit', second:'2-digit' });
+    chartHistory.labels.push(label);
+    chartHistory.indoorTemp.push(!isNaN(indoorTemp) && indoorTemp !== null ? parseFloat(indoorTemp.toFixed(1)) : null);
+    chartHistory.outdoorTemp.push(!isNaN(outdoorTemp) && outdoorTemp !== null ? parseFloat(outdoorTemp.toFixed(1)) : null);
+    chartHistory.lightLevel.push(!isNaN(lightLevel) && lightLevel !== null ? parseFloat(lightLevel) : null);
+
+    const BUFFER = 500;
+    if (chartHistory.labels.length > BUFFER) {
+        chartHistory.labels.shift(); chartHistory.indoorTemp.shift();
+        chartHistory.outdoorTemp.shift(); chartHistory.lightLevel.shift();
+    }
+    refreshChartView();
+    updateStatsSummary(chartHistory.indoorTemp, chartHistory.outdoorTemp, chartHistory.lightLevel, chartHistory.labels.length);
+}
+
+function renderChartsWithData(labels, indoor, outdoor, light) {
+    if (!tempChartInstance || !lightChartInstance) return;
+    tempChartInstance.data.labels = labels;
+    tempChartInstance.data.datasets[0].data = indoor;
+    tempChartInstance.data.datasets[1].data = outdoor;
+    tempChartInstance.update('none');
+    lightChartInstance.data.labels = labels;
+    lightChartInstance.data.datasets[0].data = light;
+    lightChartInstance.update('none');
+}
+
+function refreshChartView() {
+    if (viewingHistorical || !tempChartInstance) return;
+    const max = getMaxPoints();
+    renderChartsWithData(
+        chartHistory.labels.slice(-max),
+        chartHistory.indoorTemp.slice(-max),
+        chartHistory.outdoorTemp.slice(-max),
+        chartHistory.lightLevel.slice(-max)
+    );
+}
+
+function updateStatsSummary(indoor, outdoor, light, count) {
+    const validNums = arr => (arr||[]).filter(v => v !== null && !isNaN(v));
+    const setMinMax = (id, arr, unit) => {
+        const el = document.getElementById(id); if (!el) return;
+        const nums = validNums(arr);
+        if (!nums.length) { el.textContent = '-- / --' + unit; return; }
+        el.textContent = Math.min(...nums).toFixed(1) + ' / ' + Math.max(...nums).toFixed(1) + unit;
+    };
+    setMinMax('statIndoorMinMax',  indoor,  '°C');
+    setMinMax('statOutdoorMinMax', outdoor, '°C');
+    setMinMax('statLightMinMax',   light,   '%');
+    const el = document.getElementById('statReadingsCount');
+    if (el) el.textContent = (count || 0);
+}
+
+// ---------- Chart initialisation ----------
 function initCharts() {
-    const tempCtx = document.getElementById('tempChart');
+    const tempCtx  = document.getElementById('tempChart');
     const lightCtx = document.getElementById('lightChart');
     if (!tempCtx || !lightCtx) return;
 
     // ---- Toggle / Close panel ----
-    const panel       = document.getElementById('statsFloatingPanel');
-    const toggleBtn   = document.getElementById('statsToggleBtn');
-    const closeBtn    = document.getElementById('statsCloseBtn');
-    const arrow       = document.getElementById('statsToggleArrow');
+    const panel     = document.getElementById('statsFloatingPanel');
+    const toggleBtn = document.getElementById('statsToggleBtn');
+    const closeBtn  = document.getElementById('statsCloseBtn');
+    const arrow     = document.getElementById('statsToggleArrow');
 
     function openPanel() {
         panel.style.display = 'block';
-        requestAnimationFrame(() => {
-            panel.style.opacity = '1';
-            panel.style.transform = 'translateY(0)';
-        });
+        requestAnimationFrame(() => { panel.style.opacity = '1'; panel.style.transform = 'translateY(0)'; });
         arrow.style.transform = 'rotate(180deg)';
         setTimeout(() => {
             if (tempChartInstance) tempChartInstance.resize();
             if (lightChartInstance) lightChartInstance.resize();
         }, 50);
+        // Refresh day picker each time panel opens
+        if (isConnected) loadAvailableDays(renderDayPicker);
+        // Run initial prune
+        pruneOldHistory();
     }
 
     function closePanel() {
-        panel.style.opacity = '0';
-        panel.style.transform = 'translateY(-8px)';
+        panel.style.opacity = '0'; panel.style.transform = 'translateY(-8px)';
         arrow.style.transform = 'rotate(0deg)';
         setTimeout(() => { panel.style.display = 'none'; }, 250);
     }
 
     let panelOpen = false;
-    toggleBtn.addEventListener('click', () => {
-        panelOpen = !panelOpen;
-        panelOpen ? openPanel() : closePanel();
+    toggleBtn.addEventListener('click', () => { panelOpen = !panelOpen; panelOpen ? openPanel() : closePanel(); });
+    closeBtn.addEventListener('click', () => { panelOpen = false; closePanel(); });
+
+    // Live button
+    const liveBtn = document.getElementById('goLiveBtn');
+    if (liveBtn) liveBtn.addEventListener('click', () => {
+        document.querySelectorAll('.day-pill').forEach(b => {
+            b.classList.remove('active-day');
+            b.style.background = 'rgba(102,126,234,0.12)';
+            b.style.color = '#667eea';
+        });
+        switchToLive();
     });
-    closeBtn.addEventListener('click', () => {
-        panelOpen = false;
-        closePanel();
+
+    // Time window selector
+    const sel = document.getElementById('chartTimeWindow');
+    if (sel) sel.addEventListener('change', refreshChartView);
+
+    // Clear live buffer
+    const clearBtn = document.getElementById('clearChartBtn');
+    if (clearBtn) clearBtn.addEventListener('click', () => {
+        if (viewingHistorical) { switchToLive(); return; }
+        chartHistory.labels = []; chartHistory.indoorTemp = [];
+        chartHistory.outdoorTemp = []; chartHistory.lightLevel = [];
+        refreshChartView();
+        updateStatsSummary([], [], [], 0);
     });
 
     // ---- Drag to reposition ----
     const header = document.getElementById('statsPanelHeader');
     let dragging = false, startX, startY, origLeft, origTop;
-
     header.addEventListener('mousedown', (e) => {
         if (e.target.tagName === 'BUTTON' || e.target.tagName === 'SELECT') return;
-        dragging = true;
-        startX = e.clientX; startY = e.clientY;
-        const rect = panel.getBoundingClientRect();
-        origLeft = rect.left; origTop = rect.top;
-        panel.style.transition = 'none';
-        document.body.style.userSelect = 'none';
+        dragging = true; startX = e.clientX; startY = e.clientY;
+        const rect = panel.getBoundingClientRect(); origLeft = rect.left; origTop = rect.top;
+        panel.style.transition = 'none'; document.body.style.userSelect = 'none';
     });
     document.addEventListener('mousemove', (e) => {
         if (!dragging) return;
@@ -879,19 +1127,13 @@ function initCharts() {
         panel.style.top  = Math.max(0, origTop  + e.clientY - startY) + 'px';
     });
     document.addEventListener('mouseup', () => {
-        dragging = false;
-        panel.style.transition = 'opacity 0.25s, transform 0.25s';
+        dragging = false; panel.style.transition = 'opacity 0.25s, transform 0.25s';
         document.body.style.userSelect = '';
     });
-
-    // Touch drag for mobile
     header.addEventListener('touchstart', (e) => {
         if (e.target.tagName === 'BUTTON' || e.target.tagName === 'SELECT') return;
-        const t = e.touches[0];
-        dragging = true;
-        startX = t.clientX; startY = t.clientY;
-        const rect = panel.getBoundingClientRect();
-        origLeft = rect.left; origTop = rect.top;
+        const t = e.touches[0]; dragging = true; startX = t.clientX; startY = t.clientY;
+        const rect = panel.getBoundingClientRect(); origLeft = rect.left; origTop = rect.top;
         panel.style.transition = 'none';
     }, { passive: true });
     document.addEventListener('touchmove', (e) => {
@@ -901,224 +1143,72 @@ function initCharts() {
         panel.style.top  = Math.max(0, origTop  + t.clientY - startY) + 'px';
     }, { passive: true });
     document.addEventListener('touchend', () => {
-        dragging = false;
-        panel.style.transition = 'opacity 0.25s, transform 0.25s';
+        dragging = false; panel.style.transition = 'opacity 0.25s, transform 0.25s';
     });
 
+    // ---- Build charts ----
     const commonOptions = {
-        responsive: true,
-        maintainAspectRatio: false,
-        animation: { duration: 400 },
+        responsive: true, maintainAspectRatio: false,
+        animation: { duration: 300 },
         plugins: {
             legend: { display: false },
-            tooltip: {
-                mode: 'index',
-                intersect: false,
+            tooltip: { mode: 'index', intersect: false,
                 backgroundColor: 'rgba(0,0,0,0.75)',
-                titleFont: { size: 11 },
-                bodyFont: { size: 11 }
-            }
+                titleFont: { size: 11 }, bodyFont: { size: 11 } }
         },
         scales: {
-            x: {
-                ticks: { maxTicksLimit: 8, font: { size: 10 }, color: '#555' },
-                grid: { color: 'rgba(0,0,0,0.05)' }
-            },
-            y: {
-                ticks: { font: { size: 10 }, color: '#555' },
-                grid: { color: 'rgba(0,0,0,0.07)' }
-            }
+            x: { ticks: { maxTicksLimit: 8, font: { size: 10 }, color: '#555' }, grid: { color: 'rgba(0,0,0,0.05)' } },
+            y: { ticks: { font: { size: 10 }, color: '#555' }, grid: { color: 'rgba(0,0,0,0.07)' } }
         },
-        elements: {
-            point: { radius: 2, hoverRadius: 5 },
-            line: { tension: 0.35, borderWidth: 2 }
-        }
+        elements: { point: { radius: 2, hoverRadius: 5 }, line: { tension: 0.35, borderWidth: 2 } }
     };
 
-    // Temperature chart
     tempChartInstance = new Chart(tempCtx, {
         type: 'line',
         data: {
             labels: [],
             datasets: [
-                {
-                    label: 'Indoor (°C)',
-                    data: [],
-                    borderColor: '#667eea',
-                    backgroundColor: 'rgba(102,126,234,0.12)',
-                    fill: true
-                },
-                {
-                    label: 'Outdoor (°C)',
-                    data: [],
-                    borderColor: '#f6ad55',
-                    backgroundColor: 'rgba(246,173,85,0.10)',
-                    fill: true
-                }
+                { label: 'Indoor (°C)',  data: [], borderColor: '#667eea', backgroundColor: 'rgba(102,126,234,0.12)', fill: true },
+                { label: 'Outdoor (°C)', data: [], borderColor: '#f6ad55', backgroundColor: 'rgba(246,173,85,0.10)',  fill: true }
             ]
         },
-        options: {
-            ...commonOptions,
-            scales: {
-                ...commonOptions.scales,
-                y: {
-                    ...commonOptions.scales.y,
-                    title: { display: true, text: '°C', font: { size: 10 } }
-                }
-            }
-        }
+        options: { ...commonOptions, scales: { ...commonOptions.scales,
+            y: { ...commonOptions.scales.y, title: { display: true, text: '°C', font: { size: 10 } } } } }
     });
 
-    // Light chart
     lightChartInstance = new Chart(lightCtx, {
         type: 'line',
         data: {
             labels: [],
-            datasets: [
-                {
-                    label: 'Light Level (%)',
-                    data: [],
-                    borderColor: '#ecc94b',
-                    backgroundColor: 'rgba(236,201,75,0.15)',
-                    fill: true
-                }
-            ]
+            datasets: [{ label: 'Light Level (%)', data: [], borderColor: '#ecc94b', backgroundColor: 'rgba(236,201,75,0.15)', fill: true }]
         },
-        options: {
-            ...commonOptions,
-            scales: {
-                ...commonOptions.scales,
-                y: {
-                    ...commonOptions.scales.y,
-                    min: 0,
-                    max: 100,
-                    title: { display: true, text: '%', font: { size: 10 } }
-                }
-            }
-        }
-    });
-
-    // Wire up controls
-    const sel = document.getElementById('chartTimeWindow');
-    if (sel) sel.addEventListener('change', refreshChartView);
-
-    const clearBtn = document.getElementById('clearChartBtn');
-    if (clearBtn) clearBtn.addEventListener('click', () => {
-        chartHistory.labels = [];
-        chartHistory.indoorTemp = [];
-        chartHistory.outdoorTemp = [];
-        chartHistory.lightLevel = [];
-        refreshChartView();
-        updateStatsSummary();
+        options: { ...commonOptions, scales: { ...commonOptions.scales,
+            y: { ...commonOptions.scales.y, min: 0, max: 100, title: { display: true, text: '%', font: { size: 10 } } } } }
     });
 }
 
-function pushChartPoint(indoorTemp, outdoorTemp, lightLevel) {
-    const now = new Date();
-    const label = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-
-    chartHistory.labels.push(label);
-    chartHistory.indoorTemp.push(indoorTemp > 0 ? parseFloat(indoorTemp.toFixed(1)) : null);
-    chartHistory.outdoorTemp.push(outdoorTemp > 0 ? parseFloat(outdoorTemp.toFixed(1)) : null);
-    chartHistory.lightLevel.push(lightLevel !== null ? parseFloat(lightLevel) : null);
-
-    // Keep a generous buffer; view is trimmed per selector
-    const BUFFER = 200;
-    if (chartHistory.labels.length > BUFFER) {
-        chartHistory.labels.shift();
-        chartHistory.indoorTemp.shift();
-        chartHistory.outdoorTemp.shift();
-        chartHistory.lightLevel.shift();
-    }
-
-    refreshChartView();
-    updateStatsSummary();
-}
-
-function refreshChartView() {
-    if (!tempChartInstance || !lightChartInstance) return;
-
-    const max = getMaxPoints();
-    const slice = (arr) => arr.slice(-max);
-
-    const labels = slice(chartHistory.labels);
-
-    tempChartInstance.data.labels = labels;
-    tempChartInstance.data.datasets[0].data = slice(chartHistory.indoorTemp);
-    tempChartInstance.data.datasets[1].data = slice(chartHistory.outdoorTemp);
-    tempChartInstance.update('none');
-
-    lightChartInstance.data.labels = labels;
-    lightChartInstance.data.datasets[0].data = slice(chartHistory.lightLevel);
-    lightChartInstance.update('none');
-}
-
-function updateStatsSummary() {
-    const validNums = (arr) => arr.filter(v => v !== null && !isNaN(v));
-
-    const setMinMax = (id, arr, unit) => {
-        const el = document.getElementById(id);
-        if (!el) return;
-        const nums = validNums(arr);
-        if (nums.length === 0) { el.textContent = `-- / --${unit}`; return; }
-        el.textContent = `${Math.min(...nums).toFixed(1)} / ${Math.max(...nums).toFixed(1)}${unit}`;
-    };
-
-    setMinMax('statIndoorMinMax', chartHistory.indoorTemp, '°C');
-    setMinMax('statOutdoorMinMax', chartHistory.outdoorTemp, '°C');
-    setMinMax('statLightMinMax', chartHistory.lightLevel, '%');
-
-    const countEl = document.getElementById('statReadingsCount');
-    if (countEl) countEl.textContent = chartHistory.labels.length;
-}
-
-// Sampler: push a point every time sensor data comes in (throttled to once every 5s)
-let lastChartPush = 0;
-let latestSensorState = { indoor: 0, outdoor: 0, light: 0 };
-
-function onSensorUpdate(type, value) {
-    latestSensorState[type] = value;
-    const now = Date.now();
-    if (now - lastChartPush >= 5000) {
-        lastChartPush = now;
-        pushChartPoint(latestSensorState.indoor, latestSensorState.outdoor, latestSensorState.light);
-    }
-}
-
-// Override update functions to also feed charts
+// Override update functions — feed display + charts + Firebase
 function updateTemperatureIndoor(temp) {
-    const tempElement = document.getElementById('temperatureIndoor');
-    if (!tempElement) return;
+    const el = document.getElementById('temperatureIndoor');
+    if (!el) return;
     const parsed = parseFloat(temp);
-    if (temp !== null && temp !== undefined && !isNaN(parsed)) {
-        tempElement.textContent = parsed.toFixed(1) + '°C';
-    } else {
-        tempElement.textContent = '--°C';
-    }
+    el.textContent = (!isNaN(parsed) && temp !== null && temp !== undefined) ? parsed.toFixed(1) + '°C' : '--°C';
     onSensorUpdate('indoor', parsed);
 }
 
 function updateTemperatureOutdoor(temp) {
-    const tempElement = document.getElementById('temperatureOutdoor');
-    if (!tempElement) return;
+    const el = document.getElementById('temperatureOutdoor');
+    if (!el) return;
     const parsed = parseFloat(temp);
-    if (temp !== null && temp !== undefined && !isNaN(parsed)) {
-        tempElement.textContent = parsed.toFixed(1) + '°C';
-    } else {
-        tempElement.textContent = '--°C';
-    }
+    el.textContent = (!isNaN(parsed) && temp !== null && temp !== undefined) ? parsed.toFixed(1) + '°C' : '--°C';
     onSensorUpdate('outdoor', parsed);
 }
 
 function updateLightLevel(lightValue) {
-    const lightElement = document.getElementById('lightLevel');
-    if (!lightElement) return;
+    const el = document.getElementById('lightLevel');
+    if (!el) return;
     const parsed = parseFloat(lightValue);
-    if (lightValue !== null && lightValue !== undefined && !isNaN(parsed)) {
-        lightElement.textContent = parsed.toFixed(0) + '%';
-    } else {
-        lightElement.textContent = '--';
-    }
+    el.textContent = (!isNaN(parsed) && lightValue !== null && lightValue !== undefined) ? parsed.toFixed(0) + '%' : '--';
     onSensorUpdate('light', parsed);
 }
 
