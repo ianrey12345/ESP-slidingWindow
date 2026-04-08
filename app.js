@@ -451,6 +451,14 @@ function setupRealtimeListeners() {
         }
     });
 
+    realtimeListeners.avgTemp = database.ref('/averageTemperature').on('value', (snapshot) => {
+    const avg = snapshot.val();
+    if (avg !== null && avg !== undefined) {
+        const el = document.getElementById('avgTempDisplay');
+        if (el) el.textContent = parseFloat(avg).toFixed(1) + '°C';
+    }
+});
+
     // Auto Control Listeners
     realtimeListeners.autoTemp = database.ref('/autoTempControl').on('value', (snapshot) => {
         const enabled = snapshot.val();
