@@ -80,9 +80,13 @@
                 <div class="status-card light">
                     <h3> Light Level</h3>
                     <div class="status-value" id="lightLevel">--</div>
-                    <div class="sensor-status" id="lightCondition">--</div>
+                    <div style="display: flex; align-items: center; justify-content: center; gap: 10px; flex-wrap: wrap;">
+                        <div class="sensor-status" id="lightCondition">--</div>
+                        <div style="font-size: 0.82rem; background: rgba(102,126,234,0.1); border-radius: 6px; padding: 3px 9px; font-weight: 500; color: #555;">
+                            Avg Temp: <span id="avgTempDisplay" style="color: #667eea; font-weight: 700;">--°C</span>
+                        </div>
+                    </div>
                 </div>
-            </div>
 
             <!-- ===================== STATISTICS TOGGLE BUTTON ===================== -->
             <div style="display: flex; justify-content: flex-start; margin-bottom: 18px;">
