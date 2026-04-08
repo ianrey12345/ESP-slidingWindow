@@ -942,8 +942,27 @@ function onSensorUpdate(type, value) {
 // ---------- Available days list ----------
 function loadAvailableDays(callback) {
     database.ref('/sensorHistory').once('value').then(snap => {
-        const days = [];
-        if (snap.val()) snap.forEach(d => days.push(d.key));
+        if (!snap.val()) { callback([]); return; }
+
+        const daySet = new Set();
+        snap.forEach(child => {
+            const k = child.key;
+            // Date key format: "2026-04-08"
+            if (/^\d{4}-\d{2}-\d{2}$/.test(k)) {
+                daySet.add(k);
+            } else if (/^\d{10,15}$/.test(k)) {
+                // Flat timestamp key — derive date from the entry's ts field or the key itself
+                const entry = child.val();
+                const ts = (entry && entry.ts) ? entry.ts : parseInt(k);
+                const d = new Date(ts);
+                const dateKey = d.getFullYear() + '-' +
+                    String(d.getMonth()+1).padStart(2,'0') + '-' +
+                    String(d.getDate()).padStart(2,'0');
+                daySet.add(dateKey);
+            }
+        });
+
+        const days = Array.from(daySet);
         days.sort((a,b) => b.localeCompare(a)); // newest first
         callback(days);
     }).catch(() => callback([]));
@@ -954,12 +973,43 @@ function loadDayHistory(dateKey) {
     const loadingEl = document.getElementById('historyLoading');
     if (loadingEl) { loadingEl.style.display = 'block'; loadingEl.textContent = 'Loading ' + dateKey + '...'; }
 
+    // Try nested date key first, then fall back to scanning flat timestamps
     database.ref('/sensorHistory/' + dateKey)
         .orderByKey()
         .once('value')
         .then(snap => {
+            // If nested date key has children with sensor data, use them
+            if (snap.val() && snap.hasChildren()) {
+                const firstChild = snap.val()[Object.keys(snap.val())[0]];
+                if (firstChild && (firstChild.ts || firstChild.indoor !== undefined)) {
+                    return snap; // normal nested structure
+                }
+            }
+            // Flat structure — scan entire /sensorHistory for entries matching dateKey
+            return database.ref('/sensorHistory').orderByKey().once('value').then(fullSnap => {
+                const filtered = {};
+                if (fullSnap.val()) {
+                    fullSnap.forEach(child => {
+                        const k = child.key;
+                        if (/^\d{10,15}$/.test(k)) {
+                            const entry = child.val();
+                            const ts = (entry && entry.ts) ? entry.ts : parseInt(k);
+                            const d = new Date(ts);
+                            const entryDate = d.getFullYear() + '-' +
+                                String(d.getMonth()+1).padStart(2,'0') + '-' +
+                                String(d.getDate()).padStart(2,'0');
+                            if (entryDate === dateKey) filtered[k] = entry;
+                        }
+                    });
+                }
+                return { val: () => Object.keys(filtered).length ? filtered : null,
+                         hasChildren: () => Object.keys(filtered).length > 0,
+                         forEach: (fn) => Object.keys(filtered).sort().forEach(k => fn({ val: () => filtered[k] })) };
+            });
+        })
+        .then(snap => {
             if (loadingEl) loadingEl.style.display = 'none';
-            if (!snap.val()) {
+            if (!snap || !snap.val()) {
                 showNotification('No data found for ' + dateKey, 'warning');
                 return;
             }
@@ -968,7 +1018,7 @@ function loadDayHistory(dateKey) {
             const labels = [], indoor = [], outdoor = [], light = [];
             snap.forEach(entry => {
                 const e = entry.val();
-                const t = new Date(e.ts);
+                const t = new Date(e.ts || parseInt(Object.keys(e)[0]));
                 labels.push(t.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
                 indoor.push(e.indoor !== null && !isNaN(e.indoor) ? parseFloat(e.indoor.toFixed(1)) : null);
                 outdoor.push(e.outdoor !== null && !isNaN(e.outdoor) ? parseFloat(e.outdoor.toFixed(1)) : null);
@@ -977,11 +1027,8 @@ function loadDayHistory(dateKey) {
 
             viewingHistorical = true;
             renderChartsWithData(labels, indoor, outdoor, light);
-
-            // Update summary with historical data
             updateStatsSummary(indoor, outdoor, light, labels.length);
 
-            // Show banner
             const banner = document.getElementById('historyBanner');
             if (banner) {
                 banner.style.display = 'block';
