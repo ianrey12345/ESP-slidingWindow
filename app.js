@@ -834,38 +834,85 @@ function todayKey() {
 
 function saveReadingToFirebase() {
     if (!isConnected || !currentUser) return;
-    if (latestSensorState.indoor === null) return;
+    if (latestSensorState.indoor === null && latestSensorState.outdoor === null) return;
 
-    const now   = Date.now();
-    const key   = todayKey();
+    const now = Date.now();
+    const key = todayKey();
     const entry = {
         ts:      now,
-        indoor:  latestSensorState.indoor,
-        outdoor: latestSensorState.outdoor,
-        light:   latestSensorState.light
+        indoor:  latestSensorState.indoor  !== null ? latestSensorState.indoor  : null,
+        outdoor: latestSensorState.outdoor !== null ? latestSensorState.outdoor : null,
+        light:   latestSensorState.light   !== null ? latestSensorState.light   : null
     };
 
+    // Save reading under today's date key
     database.ref('/sensorHistory/' + key + '/' + now).set(entry)
+        .then(() => console.log('History saved:', key, new Date(now).toLocaleTimeString()))
         .catch(err => console.warn('History save failed:', err.message));
+
+    // Mark the day as "not yet viewed" if it has no viewedAt timestamp
+    database.ref('/sensorHistoryMeta/' + key + '/createdAt').once('value').then(snap => {
+        if (!snap.val()) {
+            database.ref('/sensorHistoryMeta/' + key).set({
+                createdAt: now,
+                viewedAt:  null
+            });
+        }
+    });
+}
+
+function markDayAsViewed(dateKey) {
+    if (!isConnected || !currentUser) return;
+    database.ref('/sensorHistoryMeta/' + dateKey + '/viewedAt').once('value').then(snap => {
+        // Only set viewedAt once — first time user opens that day
+        if (!snap.val()) {
+            database.ref('/sensorHistoryMeta/' + dateKey + '/viewedAt').set(Date.now())
+                .then(() => console.log('Day marked as viewed:', dateKey))
+                .catch(err => console.warn('Mark viewed failed:', err.message));
+        }
+    });
 }
 
 function pruneOldHistory() {
     if (!isConnected || !currentUser) return;
-    const cutoff = new Date();
-    cutoff.setDate(cutoff.getDate() - HISTORY_MAX_DAYS);
 
-    database.ref('/sensorHistory').once('value').then(snap => {
+    database.ref('/sensorHistoryMeta').once('value').then(snap => {
         if (!snap.val()) return;
         const removes = [];
+        const now = Date.now();
+        const ONE_WEEK_MS = 7 * 24 * 60 * 60 * 1000;
+
         snap.forEach(daySnap => {
-            const parts = daySnap.key.split('-').map(Number);
-            const dayDate = new Date(parts[0], parts[1]-1, parts[2]);
-            if (dayDate < cutoff) {
-                removes.push(database.ref('/sensorHistory/' + daySnap.key).remove());
+            const meta = daySnap.val();
+            const dateKey = daySnap.key;
+
+            // Rule 1: delete if viewed AND it has been more than 7 days since creation
+            const isOldEnough = meta.createdAt && (now - meta.createdAt) > ONE_WEEK_MS;
+            const wasViewed   = meta.viewedAt !== null && meta.viewedAt !== undefined;
+
+            if (isOldEnough && wasViewed) {
+                removes.push(
+                    database.ref('/sensorHistory/' + dateKey).remove(),
+                    database.ref('/sensorHistoryMeta/' + dateKey).remove()
+                );
+                console.log('Pruning viewed+old day:', dateKey);
+            }
+
+            // Rule 2: delete if older than 14 days regardless (safety cleanup)
+            const TWO_WEEKS_MS = 14 * 24 * 60 * 60 * 1000;
+            if (meta.createdAt && (now - meta.createdAt) > TWO_WEEKS_MS) {
+                removes.push(
+                    database.ref('/sensorHistory/' + dateKey).remove(),
+                    database.ref('/sensorHistoryMeta/' + dateKey).remove()
+                );
+                console.log('Force pruning old day:', dateKey);
             }
         });
-        if (removes.length) Promise.all(removes).then(() =>
-            console.log('Pruned', removes.length, 'old history day(s)'));
+
+        if (removes.length) {
+            Promise.all(removes).then(() =>
+                console.log('Pruned', removes.length / 2, 'old history day(s)'));
+        }
     }).catch(err => console.warn('Prune check failed:', err.message));
 }
 
@@ -916,6 +963,7 @@ function loadDayHistory(dateKey) {
                 showNotification('No data found for ' + dateKey, 'warning');
                 return;
             }
+            markDayAsViewed(dateKey);
 
             const labels = [], indoor = [], outdoor = [], light = [];
             snap.forEach(entry => {
