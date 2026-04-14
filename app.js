@@ -450,6 +450,13 @@ function setupRealtimeListeners() {
             updateLightCondition(condition);
         }
     });
+    
+    realtimeListeners.lightLux = database.ref('/lightLux').on('value', (snapshot) => {
+    const lux = snapshot.val();
+    if (lux !== null) {
+        updateLightLux(lux);
+    }
+});
 
     realtimeListeners.avgTemp = database.ref('/averageTemperature').on('value', (snapshot) => {
     const avg = snapshot.val();
@@ -500,6 +507,7 @@ function removeRealtimeListeners() {
         outdoorAvail: '/dhtOutdoorAvailable',
         light: '/lightLevel',
         lightCondition: '/lightCondition',
+        lightLux: '/lightLux',
         tempClose: '/tempCloseThreshold',
         tempOpen: '/tempOpenThreshold',
         tilt: '/tiltPosition',
@@ -567,6 +575,14 @@ function updateLightCondition(condition) {
     const conditionElement = document.getElementById('lightCondition');
     if (conditionElement) {
         conditionElement.textContent = condition.charAt(0).toUpperCase() + condition.slice(1);
+    }
+}
+
+function updateLightLux(lux) {
+    const luxElement = document.getElementById('lightLuxDisplay');
+    if (luxElement) {
+        const parsed = parseFloat(lux);
+        luxElement.textContent = (!isNaN(parsed)) ? parsed.toFixed(1) + ' lux' : '-- lux';
     }
 }
 
