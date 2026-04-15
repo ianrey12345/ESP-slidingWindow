@@ -120,7 +120,7 @@ body {
 
 .header h1 {
     font-size: 2.5rem;
-    background: linear-gradient(45deg, #012ce7, #0d0d0e);
+    background: linear-gradient(45deg, #000000, #333333);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
